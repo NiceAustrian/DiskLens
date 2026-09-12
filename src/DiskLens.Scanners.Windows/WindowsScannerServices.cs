@@ -13,6 +13,7 @@ public static class WindowsScannerServices
         if (!OperatingSystem.IsWindows()) return services;
         services.Replace(ServiceDescriptor.Singleton<IElevationService, WindowsElevationService>());
         services.Replace(ServiceDescriptor.Singleton<IFileOperations, WindowsFileOperations>());
+        services.Replace(ServiceDescriptor.Singleton<INativeContextMenu, ShellContextMenu>());
         services.AddScanner<Ntfs.MftScanner>();
         return services;
     }

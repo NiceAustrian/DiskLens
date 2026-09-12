@@ -36,6 +36,7 @@ public sealed class AppShell
         IScanService scans,
         IElevationService elevation,
         IFileOperations files,
+        INativeContextMenu nativeMenu,
         ILoggerFactory loggerFactory,
         UiRoot root)
     {
@@ -43,6 +44,7 @@ public sealed class AppShell
         Scans = scans;
         Elevation = elevation;
         Files = files;
+        NativeMenu = nativeMenu;
         LoggerFactory = loggerFactory;
         Root = root;
 
@@ -55,6 +57,16 @@ public sealed class AppShell
     public IScanService Scans { get; }
     public IElevationService Elevation { get; }
     public IFileOperations Files { get; }
+    public INativeContextMenu NativeMenu { get; }
+
+    /// <summary>Shows the platform file menu for <paramref name="path"/> at a logical window point. Blocks while open.</summary>
+    public void ShowNativeMenu(string path, SKPoint at)
+    {
+        if (_window is null || !NativeMenu.IsSupported) return;
+        var window = new NativeWindow(_window.NativeHandle, f => _window.Chrome.AddMessageFilter((h, m, w, l) => f(h, m, w, l)));
+        NativeMenu.Show(path, window, (int)(at.X * _window.Scale), (int)(at.Y * _window.Scale));
+        Root.RequestRedraw();
+    }
     public ILoggerFactory LoggerFactory { get; }
     public UiRoot Root { get; }
 

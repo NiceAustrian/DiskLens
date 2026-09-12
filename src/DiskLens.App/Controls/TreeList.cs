@@ -246,7 +246,7 @@ public sealed class TreeList : Element
             {
                 SelectedRow = index;
                 Vm.Selected = node;
-                Vm.RequestContextMenu(node, e.Position);
+                Vm.RequestContextMenu(node, e.Position, native: (e.Modifiers & Modifiers.Shift) != 0);
                 e.Handled = true;
                 return;
             }

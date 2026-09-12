@@ -10,71 +10,80 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-var builder = Host.CreateApplicationBuilder(args);
-
-builder.Logging.ClearProviders();
-builder.Logging.AddSimpleConsole(o => { o.SingleLine = true; o.TimestampFormat = "HH:mm:ss.fff "; });
-builder.Logging.SetMinimumLevel(args.Contains("--debug") ? LogLevel.Debug : LogLevel.Information);
-
-builder.Services
-    .AddDiskLensCore()
-    .AddGenericScanners();
-
-if (OperatingSystem.IsWindows())
-    builder.Services.AddWindowsScanners();
-else
-    builder.Services.AddPosixScanners();
-
-builder.Services.AddSingleton(new WindowConfig("DiskLens", 1360, 860) { IconPng = AppAssets.IconPng });
-builder.Services.AddSingleton(sp => new UiRoot(args.Contains("--light") ? Theme.Light : Theme.Dark));
-builder.Services.AddSingleton(sp => new AppWindow(
-    sp.GetRequiredService<WindowConfig>(),
-    sp.GetRequiredService<UiRoot>(),
-    sp.GetRequiredService<ILogger<AppWindow>>()));
-builder.Services.AddSingleton<AppShell>();
-
-using var host = builder.Build();
-
-// Headless benchmark: DiskLens --bench <path> [--scanner <id>]
-if (args.Contains("--bench"))
+static class Program
 {
-    if (OperatingSystem.IsWindows()) ConsoleAttach.AttachToParent();
-    var path = args.FirstOrDefault(a => !a.StartsWith('-') && Directory.Exists(a)) ?? Directory.GetCurrentDirectory();
-    var scannerIdx = Array.IndexOf(args, "--scanner");
-    var scannerId = scannerIdx >= 0 && scannerIdx + 1 < args.Length ? args[scannerIdx + 1] : null;
-    var scans = host.Services.GetRequiredService<DiskLens.Core.Scanning.IScanService>();
-    var volumes = host.Services.GetRequiredService<DiskLens.Core.Platform.IVolumeService>();
-    var volume = await volumes.GetVolumeForPathAsync(path, CancellationToken.None);
-    var session = await scans.StartAsync(new DiskLens.Core.Scanning.ScanTarget(path, volume), preferredScannerId: scannerId);
-    while (!session.IsFinished)
+    /// <summary>STA: the Explorer context menu (shell COM) requires an apartment-threaded UI thread.</summary>
+    [STAThread]
+    static int Main(string[] args)
     {
-        await Task.Delay(500);
-        Console.WriteLine($"  {session.Phase ?? ""} {session.NodesAdded:N0} nodes, {DiskLens.Core.ByteSize.Format(session.BytesSeen)}");
-    }
-    var tree = session.Tree;
-    Console.WriteLine($"{session.State}: {session.Scanner.Id} · {tree.FileCount(0):N0} files · {tree.DirCount(0):N0} dirs · {DiskLens.Core.ByteSize.Format(tree.TotalSize(0))} · {session.Elapsed.TotalSeconds:0.00}s · {session.Errors.Count} errors");
-    if (session.Error is not null) Console.WriteLine(session.Error);
-    Console.WriteLine($"Working set: {Environment.WorkingSet / 1024 / 1024} MB, GC heap: {GC.GetTotalMemory(false) / 1024 / 1024} MB");
+        var builder = Host.CreateApplicationBuilder(args);
 
-    // Name statistics: how much do strings cost and how many are duplicates?
-    long chars = 0, nonAscii = 0;
-    var distinct = new HashSet<string>(StringComparer.Ordinal);
-    for (var i = 0; i < tree.Count; i++)
-    {
-        var n = tree.Name(i);
-        chars += n.Length;
-        foreach (var c in n) if (c > 127) { nonAscii++; break; }
-        distinct.Add(n);
+        builder.Logging.ClearProviders();
+        builder.Logging.AddSimpleConsole(o => { o.SingleLine = true; o.TimestampFormat = "HH:mm:ss.fff "; });
+        builder.Logging.SetMinimumLevel(args.Contains("--debug") ? LogLevel.Debug : LogLevel.Information);
+
+        builder.Services
+            .AddDiskLensCore()
+            .AddGenericScanners();
+
+        if (OperatingSystem.IsWindows())
+            builder.Services.AddWindowsScanners();
+        else
+            builder.Services.AddPosixScanners();
+
+        builder.Services.AddSingleton(new WindowConfig("DiskLens", 1360, 860) { IconPng = AppAssets.IconPng });
+        builder.Services.AddSingleton(sp => new UiRoot(args.Contains("--light") ? Theme.Light : Theme.Dark));
+        builder.Services.AddSingleton(sp => new AppWindow(
+            sp.GetRequiredService<WindowConfig>(),
+            sp.GetRequiredService<UiRoot>(),
+            sp.GetRequiredService<ILogger<AppWindow>>()));
+        builder.Services.AddSingleton<AppShell>();
+
+        using var host = builder.Build();
+
+        // Headless benchmark: DiskLens --bench <path> [--scanner <id>]
+        if (args.Contains("--bench"))
+        {
+            if (OperatingSystem.IsWindows()) ConsoleAttach.AttachToParent();
+            var path = args.FirstOrDefault(a => !a.StartsWith('-') && Directory.Exists(a)) ?? Directory.GetCurrentDirectory();
+            var scannerIdx = Array.IndexOf(args, "--scanner");
+            var scannerId = scannerIdx >= 0 && scannerIdx + 1 < args.Length ? args[scannerIdx + 1] : null;
+            var scans = host.Services.GetRequiredService<DiskLens.Core.Scanning.IScanService>();
+            var volumes = host.Services.GetRequiredService<DiskLens.Core.Platform.IVolumeService>();
+            var volume = volumes.GetVolumeForPathAsync(path, CancellationToken.None).AsTask().GetAwaiter().GetResult();
+            var session = scans.StartAsync(new DiskLens.Core.Scanning.ScanTarget(path, volume), preferredScannerId: scannerId).GetAwaiter().GetResult();
+            while (!session.IsFinished)
+            {
+                Thread.Sleep(500);
+                Console.WriteLine($"  {session.Phase ?? ""} {session.NodesAdded:N0} nodes, {DiskLens.Core.ByteSize.Format(session.BytesSeen)}");
+            }
+            var tree = session.Tree;
+            Console.WriteLine($"{session.State}: {session.Scanner.Id} · {tree.FileCount(0):N0} files · {tree.DirCount(0):N0} dirs · {DiskLens.Core.ByteSize.Format(tree.TotalSize(0))} · {session.Elapsed.TotalSeconds:0.00}s · {session.Errors.Count} errors");
+            if (session.Error is not null) Console.WriteLine(session.Error);
+            Console.WriteLine($"Working set: {Environment.WorkingSet / 1024 / 1024} MB, GC heap: {GC.GetTotalMemory(false) / 1024 / 1024} MB");
+
+            // Name statistics: how much do strings cost and how many are duplicates?
+            long chars = 0, nonAscii = 0;
+            var distinct = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < tree.Count; i++)
+            {
+                var n = tree.Name(i);
+                chars += n.Length;
+                foreach (var c in n) if (c > 127) { nonAscii++; break; }
+                distinct.Add(n);
+            }
+            Console.WriteLine($"Names: {tree.Count:N0} nodes, avg {chars / (double)tree.Count:0.0} chars, {distinct.Count:N0} distinct ({100.0 * distinct.Count / tree.Count:0.0}%), {nonAscii:N0} non-ASCII, pool {tree.Names.Bytes / 1024 / 1024} MB");
+            Console.WriteLine($"Columns: ~{(tree.Count * 40L + tree.DirectoryCount * 32L) / 1024 / 1024} MB (40 B/node + 32 B/dir, {tree.DirectoryCount:N0} dirs)");
+            return 0;
+        }
+
+        var window = host.Services.GetRequiredService<AppWindow>();
+        var shell = host.Services.GetRequiredService<AppShell>();
+        shell.Attach(window, args.FirstOrDefault(a => !a.StartsWith('-')));
+        window.Run();
+        return 0;
     }
-    Console.WriteLine($"Names: {tree.Count:N0} nodes, avg {chars / (double)tree.Count:0.0} chars, {distinct.Count:N0} distinct ({100.0 * distinct.Count / tree.Count:0.0}%), {nonAscii:N0} non-ASCII, pool {tree.Names.Bytes / 1024 / 1024} MB");
-    Console.WriteLine($"Columns: ~{(tree.Count * 40L + tree.DirectoryCount * 32L) / 1024 / 1024} MB (40 B/node + 32 B/dir, {tree.DirectoryCount:N0} dirs)");
-    return;
 }
-
-var window = host.Services.GetRequiredService<AppWindow>();
-var shell = host.Services.GetRequiredService<AppShell>();
-shell.Attach(window, args.FirstOrDefault(a => !a.StartsWith('-')));
-window.Run();
 
 static class AppAssets
 {

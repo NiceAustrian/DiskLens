@@ -63,6 +63,9 @@ public sealed class AppWindow : IDisposable
     /// <summary>Frame integration. Available after the window has loaded.</summary>
     public IWindowChrome Chrome { get; private set; } = null!;
 
+    /// <summary>The OS window handle (HWND on Windows), or 0.</summary>
+    public nint NativeHandle => OperatingSystem.IsWindows() ? _window?.Native?.Win32?.Hwnd ?? 0 : 0;
+
     /// <summary>Raised once the window and its chrome exist; the app wires its title bar here.</summary>
     public event Action? Loaded;
 

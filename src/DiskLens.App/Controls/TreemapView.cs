@@ -349,7 +349,7 @@ public sealed class TreemapView : Element
         {
             var target = _hoverItem >= 0 ? _items[_hoverItem].Node : _vm.ZoomRoot;
             _vm.Selected = target;
-            _vm.RequestContextMenu(target, e.Position);
+            _vm.RequestContextMenu(target, e.Position, native: (e.Modifiers & Modifiers.Shift) != 0);
             e.Handled = true;
             return;
         }

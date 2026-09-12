@@ -27,6 +27,12 @@ public interface IWindowChrome
     void ToggleMaximize();
     void Close();
     void SetDarkMode(bool dark);
+
+    /// <summary>
+    /// Hooks the native window procedure (Windows only). The filter returns a result to swallow the
+    /// message or null to pass it on. Dispose the handle to unhook. No-op on other platforms.
+    /// </summary>
+    IDisposable AddMessageFilter(Func<nint, uint, nint, nint, nint?> filter);
 }
 
 /// <summary>Fallback for platforms where the native frame stays: nothing to do.</summary>
@@ -42,6 +48,9 @@ internal sealed class NativeChrome(Action minimize, Action toggleMaximize, Actio
     public void ToggleMaximize() => toggleMaximize();
     public void Close() => close();
     public void SetDarkMode(bool dark) { }
+    public IDisposable AddMessageFilter(Func<nint, uint, nint, nint, nint?> filter) => new NoopDisposable();
+
+    private sealed class NoopDisposable : IDisposable { public void Dispose() { } }
 }
 
 /// <summary>
@@ -58,6 +67,7 @@ internal sealed class WindowsChrome : IWindowChrome
     private readonly nint _originalProc;
     private CaptionHit _hovered, _pressed;
     private bool _tracking;
+    private readonly List<Func<nint, uint, nint, nint, nint?>> _filters = [];
 
     public WindowsChrome(nint hwnd, Func<float> scale)
     {
@@ -86,8 +96,23 @@ internal sealed class WindowsChrome : IWindowChrome
         DwmSetWindowAttribute(_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref value, sizeof(int));
     }
 
+    public IDisposable AddMessageFilter(Func<nint, uint, nint, nint, nint?> filter)
+    {
+        _filters.Add(filter);
+        return new FilterHandle(this, filter);
+    }
+
+    private sealed class FilterHandle(WindowsChrome owner, Func<nint, uint, nint, nint, nint?> filter) : IDisposable
+    {
+        public void Dispose() => owner._filters.Remove(filter);
+    }
+
     private nint HandleMessage(nint hwnd, uint msg, nint wParam, nint lParam)
     {
+        for (var i = _filters.Count - 1; i >= 0; i--)
+        {
+            if (_filters[i](hwnd, msg, wParam, lParam) is { } handled) return handled;
+        }
         switch (msg)
         {
             case WM_NCCALCSIZE when wParam != 0:

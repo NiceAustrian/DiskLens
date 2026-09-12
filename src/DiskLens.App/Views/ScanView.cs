@@ -68,9 +68,14 @@ public sealed class ScanView : Element
         UpdateStatus();
     }
 
-    private void ShowContextMenu(int node, SKPoint at)
+    private void ShowContextMenu(int node, SKPoint at, bool native)
     {
         var tree = _vm.Tree;
+        if (native && _shell.NativeMenu.IsSupported)
+        {
+            ShowNativeMenu(node, at);
+            return;
+        }
         var isDir = tree.IsDirectory(node);
         var isRoot = node == FsTree.Root;
         var finished = _vm.Session.IsFinished;
@@ -87,11 +92,24 @@ public sealed class ScanView : Element
         {
             items.Add(new("Zoom out", Icon.ArrowUp, _vm.ZoomOut, Shortcut: "Backspace"));
         }
+        if (_shell.NativeMenu.IsSupported && node != FsTree.Root)
+        {
+            items.Add(MenuItem.Separator);
+            items.Add(new("Explorer menu…", Icon.Settings, () => ShowNativeMenu(node, at), Shortcut: "Shift+Right-click"));
+        }
         items.Add(MenuItem.Separator);
         var deleteLabel = _shell.Files.SupportsRecycleBin ? "Move to Recycle Bin" : "Delete permanently";
         items.Add(new(deleteLabel, Icon.Trash, () => ConfirmDelete(node), IsDanger: true, IsEnabled: finished && !isRoot, Shortcut: "Del"));
 
         if (Root is { } root) ContextMenu.Show(root, at, [.. items]);
+    }
+
+    private void ShowNativeMenu(int node, SKPoint at)
+    {
+        // Runs modally on the UI thread; anything the user does in there (delete, rename) happens
+        // outside our tree, so offer a rescan hint afterwards.
+        _shell.ShowNativeMenu(_vm.Tree.FullPath(node), at);
+        if (_vm.Session.IsFinished) _status.Text = "Changes made through the Explorer menu show up after a rescan (F5).";
     }
 
     private void Reveal(int node)
