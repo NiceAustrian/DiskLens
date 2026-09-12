@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.HarfBuzz" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
+    <PackageReference Include="Silk.NET.Windowing" />
+    <PackageReference Include="Silk.NET.Input" />
+    <PackageReference Include="Silk.NET.OpenGL" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets/**/*" />
+  </ItemGroup>
+</Project>
