@@ -50,6 +50,7 @@ public static class TreeStatisticsBuilder
         // still have to test membership, which we do via a depth-bounded parent walk – cheap because
         // most nodes are shallow relative to the root.
         var rootDepth = tree.Depth(root);
+        Span<char> nameBuffer = stackalloc char[FsTree.MaxNameChars];
         for (var n = root; n < count; n++)
         {
             if ((n & 0xFFFF) == 0) ct.ThrowIfCancellationRequested();
@@ -65,7 +66,7 @@ public static class TreeStatisticsBuilder
             var size = tree.Size(n);
             total += size;
 
-            var ext = tree.ExtensionSpan(n);
+            var ext = tree.ExtensionSpan(n, nameBuffer);
             string key;
             if (ext.IsEmpty) key = "";
             else if (!byExtSpan.TryGetValue(ext, out key!, out _)) key = ext.ToString().ToLowerInvariant();

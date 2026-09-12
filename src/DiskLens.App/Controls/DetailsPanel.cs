@@ -89,6 +89,7 @@ public sealed class DetailsPanel : Element
             var statsFresh = stats is not null && owner._statsNode == node;
             _fileRows.Clear();
 
+            Span<char> nameBuffer = stackalloc char[FsTree.MaxNameChars];
             const float pad = 16;
             var x = Bounds.Left + pad;
             var w = Bounds.Width - 2 * pad;
@@ -96,7 +97,7 @@ public sealed class DetailsPanel : Element
 
             // Headline
             var isDir = tree.IsDirectory(node);
-            Icons.Draw(canvas, isDir ? Icon.Folder : Icon.File, x + 9, y + 9, 18, isDir ? t.Accent : FileColors.ColorOfExtension(tree.ExtensionSpan(node)), 1.6f);
+            Icons.Draw(canvas, isDir ? Icon.Folder : Icon.File, x + 9, y + 9, 18, isDir ? t.Accent : FileColors.ColorOfExtension(tree.ExtensionSpan(node, nameBuffer)), 1.6f);
             TextRender.DrawEllipsized(canvas, tree.Name(node), x + 28, y + 9, w - 28, t.Title);
             y += 26;
             TextRender.DrawEllipsizedMiddle(canvas, tree.FullPath(node), x, y + 7, w, t.MonoSmall);
@@ -185,7 +186,7 @@ public sealed class DetailsPanel : Element
                     paint.Color = f.Node == Vm.Selected ? t.Selection : t.SurfaceHover;
                     canvas.DrawRoundRect(new SKRoundRect(rowRect, t.RadiusSmall), paint);
                 }
-                paint.Color = FileColors.ColorOfExtension(tree.ExtensionSpan(f.Node));
+                paint.Color = FileColors.ColorOfExtension(tree.ExtensionSpan(f.Node, nameBuffer));
                 canvas.DrawRoundRect(new SKRoundRect(new SKRect(x, y + 7, x + 4, y + 17), 2), paint);
                 var sizeText = ByteSize.Format(f.Size);
                 var sizeW = t.MonoSmall.Measure(sizeText);

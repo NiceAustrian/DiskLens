@@ -192,7 +192,8 @@ public sealed class TreeList : Element
             x += 16;
 
             // Icon
-            var ext = tree.ExtensionSpan(node);
+            Span<char> nameBuffer = stackalloc char[FsTree.MaxNameChars];
+            var ext = tree.ExtensionSpan(node, nameBuffer);
             var category = isDir ? FileCategory.Directory : FileColors.Categorize(ext);
             var iconColor = isDir ? (isZoomRoot ? t.Accent : t.TextSecondary) : FileColors.ColorOfExtension(ext);
             Icons.Draw(canvas, isDir ? (_expanded.Contains(node) ? Icon.FolderOpen : Icon.Folder) : Icon.File, x + 8, cy, 15, iconColor, 1.5f);

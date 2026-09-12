@@ -89,7 +89,7 @@ public sealed class ScanViewModel
         Array.Sort(arr, (a, b) =>
         {
             var cmp = tree.TotalSize(b).CompareTo(tree.TotalSize(a));
-            return cmp != 0 ? cmp : string.CompareOrdinal(tree.Name(a), tree.Name(b));
+            return cmp != 0 ? cmp : tree.CompareNames(a, b);
         });
         _sortedChildren[node] = arr;
         return arr;

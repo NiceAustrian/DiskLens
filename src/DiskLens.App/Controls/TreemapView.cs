@@ -113,6 +113,7 @@ public sealed class TreemapView : Element
 
         var rects = count <= 512 ? stackalloc LayoutRect[count] : new LayoutRect[count];
         SquarifiedTreemap.Layout(weights[..count], rect, rects);
+        Span<char> nameBuffer = stackalloc char[FsTree.MaxNameChars];
 
         for (var i = 0; i < count; i++)
         {
@@ -121,7 +122,7 @@ public sealed class TreemapView : Element
             var node = kids[i];
             var isDir = tree.IsDirectory(node);
             var hasHeader = isDir && r.Width >= 48 && r.Height >= DirHeader + 12;
-            var color = isDir ? default : FileColors.ColorOfExtension(tree.ExtensionSpan(node));
+            var color = isDir ? default : FileColors.ColorOfExtension(tree.ExtensionSpan(node, nameBuffer));
             var label = hasHeader || (!isDir && r.Width >= 56 && r.Height >= 30) ? tree.Name(node) : null;
             _itemOf[node] = _items.Count;
             _items.Add(new Item(node, new SKRect(r.X, r.Y, r.Right, r.Bottom), depth, isDir, hasHeader, color, label));

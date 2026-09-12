@@ -17,7 +17,8 @@ public sealed class FsTree
 {
     // Structural columns ---------------------------------------------------------------------
     internal readonly ChunkedArray<int>       ParentCol      = new();
-    internal readonly ChunkedArray<string>    NameCol        = new();
+    internal readonly ChunkedArray<int>       NameIdCol      = new();   // id in Names
+    public NamePool Names { get; } = new();
     internal readonly ChunkedArray<NodeFlags> FlagsCol       = new();
     internal readonly ChunkedArray<long>      SizeCol        = new();   // logical size (files), 0 for dirs
     internal readonly ChunkedArray<long>      AllocatedCol   = new();   // size on disk (files), 0 for dirs
@@ -39,8 +40,11 @@ public sealed class FsTree
     public FsTree(string rootPath, string rootName)
     {
         RootPath = rootPath;
-        AppendNode(None, rootName, NodeFlags.Directory | NodeFlags.Root, 0, 0, 0, 0);
+        AppendNode(None, Names.Intern(rootName), NodeFlags.Directory | NodeFlags.Root, 0, 0, 0, 0);
     }
+
+    /// <summary>Maximum name length we decode without allocating; longer names are truncated in span APIs.</summary>
+    public const int MaxNameChars = 512;
 
     public string RootPath { get; }
 
@@ -49,7 +53,19 @@ public sealed class FsTree
 
     // Accessors ------------------------------------------------------------------------------
     public int       Parent(int node)         => ParentCol[node];
-    public string    Name(int node)           => NameCol[node];
+    /// <summary>The node's name as a string. Allocates – prefer <see cref="NameChars"/> in hot loops.</summary>
+    public string    Name(int node)           => Names.GetString(NameIdCol[node]);
+    public int       NameId(int node)         => NameIdCol[node];
+
+    /// <summary>Decodes the name into <paramref name="buffer"/> (at least <see cref="MaxNameChars"/>) and returns the used slice.</summary>
+    public ReadOnlySpan<char> NameChars(int node, Span<char> buffer)
+    {
+        var n = Names.GetChars(NameIdCol[node], buffer);
+        return n < 0 ? Name(node).AsSpan(0, Math.Min(buffer.Length, Name(node).Length)) : buffer[..n];
+    }
+
+    /// <summary>Ordinal name comparison without allocating.</summary>
+    public int CompareNames(int a, int b) => Names.Compare(NameIdCol[a], NameIdCol[b]);
     public NodeFlags Flags(int node)          => FlagsCol[node];
     public long      Size(int node)           => SizeCol[node];
     public long      Allocated(int node)      => AllocatedCol[node];
@@ -84,7 +100,7 @@ public sealed class FsTree
     {
         if (node == Root) return RootPath;
         var parts = new List<string>();
-        for (var n = node; n != Root; n = ParentCol[n]) parts.Add(NameCol[n]);
+        for (var n = node; n != Root; n = ParentCol[n]) parts.Add(Name(n));
         parts.Reverse();
         return Path.Join(RootPath, Path.Join([.. parts]));
     }
@@ -92,24 +108,25 @@ public sealed class FsTree
     /// <summary>File extension in lower-case without the dot, or "" for none / directories. Allocates.</summary>
     public string Extension(int node)
     {
-        var span = ExtensionSpan(node);
+        Span<char> buffer = stackalloc char[MaxNameChars];
+        var span = ExtensionSpan(node, buffer);
         return span.IsEmpty ? "" : span.ToString().ToLowerInvariant();
     }
 
-    /// <summary>File extension without the dot in its original case, or empty. No allocation.</summary>
-    public ReadOnlySpan<char> ExtensionSpan(int node)
+    /// <summary>File extension without the dot in its original case, or empty; decoded into <paramref name="buffer"/>. No allocation.</summary>
+    public ReadOnlySpan<char> ExtensionSpan(int node, Span<char> buffer)
     {
         if (IsDirectory(node)) return default;
-        var name = NameCol[node].AsSpan();
+        var name = NameChars(node, buffer);
         var dot = name.LastIndexOf('.');
         return dot <= 0 || dot == name.Length - 1 ? default : name[(dot + 1)..];
     }
 
     // Mutation (builder only) ----------------------------------------------------------------
-    internal int AppendNode(int parent, string name, NodeFlags flags, long size, long allocated, long modifiedTicks, int depth)
+    internal int AppendNode(int parent, int nameId, NodeFlags flags, long size, long allocated, long modifiedTicks, int depth)
     {
         var id = ParentCol.Add(parent);
-        NameCol.Add(name);
+        NameIdCol.Add(nameId);
         FlagsCol.Add(flags);
         SizeCol.Add(size);
         AllocatedCol.Add(allocated);

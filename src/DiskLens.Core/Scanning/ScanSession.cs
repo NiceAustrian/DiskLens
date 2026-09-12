@@ -83,6 +83,7 @@ public sealed class ScanSession : IDisposable
 
     private void SetState(ScanState state)
     {
+        if (state is ScanState.Completed or ScanState.Cancelled or ScanState.Failed) Builder.Seal();
         Volatile.Write(ref _state, (int)state);
         StateChanged?.Invoke(this);
     }

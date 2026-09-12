@@ -36,7 +36,7 @@ public sealed class FsTreeBuilder : IScanSink
         int id;
         lock (_gate)
         {
-            id = Tree.AppendNode(parent, entry.Name, entry.Flags | NodeFlags.Directory, 0, 0, entry.ModifiedUtcTicks, Tree.Depth(parent) + 1);
+            id = Tree.AppendNode(parent, Tree.Names.Intern(entry.Name), entry.Flags | NodeFlags.Directory, 0, 0, entry.ModifiedUtcTicks, Tree.Depth(parent) + 1);
             Tree.Link(parent, id);
         }
         Tree.Propagate(parent, 0, 0, 0, 1, entry.ModifiedUtcTicks);
@@ -54,7 +54,7 @@ public sealed class FsTreeBuilder : IScanSink
             var depth = Tree.Depth(parent) + 1;
             foreach (ref readonly var e in entries)
             {
-                var id = Tree.AppendNode(parent, e.Name, e.Flags & ~NodeFlags.Directory, e.Size, e.Allocated, e.ModifiedUtcTicks, depth);
+                var id = Tree.AppendNode(parent, Tree.Names.Intern(e.Name), e.Flags & ~NodeFlags.Directory, e.Size, e.Allocated, e.ModifiedUtcTicks, depth);
                 Tree.Link(parent, id);
                 size += e.Size;
                 allocated += e.Allocated;
@@ -82,6 +82,12 @@ public sealed class FsTreeBuilder : IScanSink
         var parent = Tree.Parent(node);
         var isDir = Tree.IsDirectory(node);
         Tree.Propagate(parent, -Tree.TotalSize(node), -Tree.TotalAllocated(node), -Tree.FileCount(node), -(Tree.DirCount(node) + (isDir ? 1 : 0)), 0);
+    }
+
+    /// <summary>Called once the scan is over: releases scan-time indexes (name de-duplication).</summary>
+    public void Seal()
+    {
+        lock (_gate) Tree.Names.Seal();
     }
 
     private string? _phase;
