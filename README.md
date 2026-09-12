@@ -6,8 +6,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Disk space analyser in the spirit of TreeSize / WizTree / WinDirStat – C# on .NET 10, with its own
-GPU-rendered UI (SkiaSharp + Silk.NET, no UI framework), cross-platform, and an NTFS MFT reader
-that scans a 1.5 TB drive in ~5 seconds.
+GPU-rendered UI (SkiaSharp, no UI framework) that runs on Windows, Linux **and Android**, and an
+NTFS MFT reader that scans a 1.3 TB drive in ~4 seconds.
 
 ![Scan view](docs/scan-view.png)
 
@@ -30,6 +30,17 @@ that scans a 1.5 TB drive in ~5 seconds.
 - Custom title bar on Windows (drag, Snap Layouts, double-click maximise all still work), dark and
   light theme, DPI aware. Event-driven render loop: 0 wake-ups when idle, partial repaints on hover.
 
+## Android
+
+The same UI, scanner and treemap run on Android (API 30+). Download `DiskLens-x.y.z-android.apk`
+from a release, install it, and grant *All files access* from the banner so the scan can see the
+whole device. Tap a folder to expand it, long-press for the menu, the ⓘ button opens the details
+sheet; rotate for the two-pane layout.
+
+Build it yourself: `dotnet workload install android`, then
+`dotnet build src/DiskLens.Android -c Release` (needs an Android SDK with platform 36 and a JDK 21;
+`dotnet build -t:InstallAndroidDependencies -p:AcceptAndroidSDKLicenses=true` fetches the SDK parts).
+
 ## Build & run
 
 ```
@@ -49,10 +60,14 @@ SkiaSharp binaries for Linux are pulled in via NuGet.
 src/
   DiskLens.Core              model, scanner abstractions, treemap layout, statistics – no UI, no platform
   DiskLens.Scanners.Generic  portable walk scanner + DriveInfo volume provider
-  DiskLens.Scanners.Windows  NTFS MFT scanner, elevation, Recycle Bin
+  DiskLens.Scanners.Windows  NTFS MFT scanner, elevation, Recycle Bin, Explorer menu
+  DiskLens.Scanners.Android  storage volumes, "All files access", file ops
   DiskLens.Scanners.Posix    (placeholder for /proc/mounts, statx, ...)
-  DiskLens.UI                the toolkit: window host, element tree, flex layout, widgets, animation
-  DiskLens.App               composition root (Generic Host + DI), shell, views, treemap/tree controls
+  DiskLens.UI                the toolkit: element tree, flex layout, widgets, animation, touch
+  DiskLens.UI.Desktop        Silk.NET window host (GLFW + OpenGL), custom Windows title bar
+  DiskLens.Presentation      shell, views, treemap/tree/details controls – shared by every host
+  DiskLens.App               desktop composition root
+  DiskLens.Android           Android app: activity + GL view hosting the same UI
 tests/DiskLens.Tests
 tools/DiskLens.IconGen       renders the app icon (PNG + ICO) from code
 ```

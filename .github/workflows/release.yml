@@ -55,3 +55,42 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: 21
+      - run: dotnet workload install android
+
+      - name: Version from tag
+        id: v
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          IFS=. read -r major minor patch <<< "$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "code=$((major * 10000 + minor * 100 + patch))" >> "$GITHUB_OUTPUT"
+
+      - name: Restore signing key
+        shell: bash
+        run: echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/release.keystore"
+
+      - name: Publish APK
+        shell: bash
+        run: |
+          dotnet publish src/DiskLens.Android -f net10.0-android -c Release             -p:Version=${{ steps.v.outputs.version }}             -p:ApplicationVersion=${{ steps.v.outputs.code }}             -p:AcceptAndroidSDKLicenses=true             -p:AndroidKeyStore=true             "-p:AndroidSigningKeyStore=$RUNNER_TEMP/release.keystore"             -p:AndroidSigningKeyAlias=disklens             "-p:AndroidSigningKeyPass=${{ secrets.ANDROID_KEYSTORE_PASS }}"             "-p:AndroidSigningStorePass=${{ secrets.ANDROID_KEYSTORE_PASS }}"             -o out/android
+          mkdir -p dist
+          cp out/android/*-Signed.apk "dist/DiskLens-${{ steps.v.outputs.version }}-android.apk"
+          (cd dist && sha256sum * > "DiskLens-${{ steps.v.outputs.version }}-android.sha256")
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

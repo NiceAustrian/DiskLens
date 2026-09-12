@@ -3,6 +3,30 @@
 All notable changes to DiskLens. The format follows [Keep a Changelog](https://keepachangelog.com/);
 versions follow [SemVer](https://semver.org/).
 
+## [0.3.0] – 2026-09-13
+
+### Added
+- **Android app** (`DiskLens-x.y.z-android.apk`, API 30+). The whole presentation layer – drive
+  picker, tree, treemap, details, context menu – runs unchanged on a GL surface; only the host is
+  new. Internal storage and removable cards come from StorageManager; the "All files access"
+  permission plays the role administrator rights play on Windows (banner → system settings).
+- Touch input in the toolkit: drag-to-scroll with fling, long-press opens the context menu, tap
+  on a folder row toggles it, finger-sized rows.
+- Phone layout: below 700 logical px the treemap sits above the tree, details open as a bottom
+  sheet (new `BottomSheet` widget), the tree hides its items/date columns. Rotation switches to the
+  two-pane layout without losing the scan.
+- Safe-area insets (status bar, gesture bar), system bar icons follow the theme.
+- `--window WxH` on the desktop build to preview phone sizes.
+
+### Changed
+- Project split: `DiskLens.UI` (toolkit, SkiaSharp only), `DiskLens.UI.Desktop` (Silk.NET host),
+  `DiskLens.Presentation` (shell + views, host-agnostic via `IAppHost`). Desktop and Android are
+  thin composition roots.
+- `Flex` measures flexible children at their real share, so wrapped text inside them gets the
+  height it needs.
+- Elevation prompts are described by the platform (`IElevationService.Prompt`), file operations
+  report whether "reveal in file manager" exists.
+
 ## [0.2.1] – 2026-09-12
 
 ### Changed
