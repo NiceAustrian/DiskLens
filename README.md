@@ -19,11 +19,12 @@ that scans a 1.5 TB drive in ~5 seconds.
 - **Details panel**: headline numbers, breakdown by file type, largest files.
 - **Live updates** while the scan runs.
 - **Scanners are plug-ins** chosen per target:
-  - `ntfs-mft` – reads the Master File Table directly (Windows, administrator). ~5 s for millions
-    of files.
+  - `ntfs-mft` – reads the Master File Table directly (Windows, administrator). 3.75 M entries on
+    a 1.3 TB drive in ~3.6 s.
   - `generic-walk` – portable parallel directory walk on top of `FileSystemEnumerator`. Works
-    everywhere; ~15 s for the same drive.
+    everywhere; ~15 s (warm cache) for the same drive.
 - Context menu: open in file manager, copy path, zoom, move to Recycle Bin (Windows) / delete.
+  Shift+right-click opens the real Explorer menu on Windows (shell extensions included).
 - Custom title bar on Windows (drag, Snap Layouts, double-click maximise all still work), dark and
   light theme, DPI aware. Event-driven render loop: 0 wake-ups when idle, partial repaints on hover.
 
@@ -33,7 +34,7 @@ that scans a 1.5 TB drive in ~5 seconds.
 dotnet run --project src/DiskLens.App                 # start with the drive picker
 dotnet run --project src/DiskLens.App -- C:\Users     # scan a folder immediately
 dotnet run --project src/DiskLens.App -- --light      # light theme
-dotnet run --project src/DiskLens.App -- --bench C:\ --scanner ntfs-mft   # headless benchmark
+dotnet run --project src/DiskLens.App -- --bench C:\ --scanner ntfs-mft   # headless benchmark + memory stats
 dotnet test
 ```
 
@@ -56,10 +57,11 @@ tools/DiskLens.IconGen       renders the app icon (PNG + ICO) from code
 
 ### Model
 
-`FsTree` is a struct-of-arrays: one `ChunkedArray<T>` per column (parent, name, size, flags, …).
-Chunks never move, so the UI can read the tree while a scanner keeps appending; aggregates
-(total size, counts) are propagated up with interlocked adds as entries arrive. 3.6 M nodes take
-~850 MB, dominated by name strings.
+`FsTree` is a struct-of-arrays: one `ChunkedArray<T>` per column (parent, name id, size, flags, …),
+40 bytes per node plus a 32-byte side table entry per directory for the aggregates. Chunks never
+move, so the UI can read the tree while a scanner keeps appending; totals are propagated up with
+interlocked adds as entries arrive. Names live in a de-duplicated UTF-8 `NamePool`. 3.75 M nodes
+take ~210 MB.
 
 ### Scanners
 
