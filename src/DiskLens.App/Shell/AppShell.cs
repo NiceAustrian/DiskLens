@@ -60,13 +60,17 @@ public sealed class AppShell
     public IFileOperations Files { get; }
     public INativeContextMenu NativeMenu { get; }
 
-    /// <summary>Shows the platform file menu for <paramref name="path"/> at a logical window point. Blocks while open.</summary>
-    public void ShowNativeMenu(string path, SKPoint at)
+    /// <summary>
+    /// Shows the platform file menu for <paramref name="path"/> at a logical window point, with our own
+    /// items on top. Blocks while open; returns the chosen custom item index or -1.
+    /// </summary>
+    public int ShowNativeMenu(string path, SKPoint at, IReadOnlyList<NativeMenuItem> customItems)
     {
-        if (_window is null || !NativeMenu.IsSupported) return;
+        if (_window is null || !NativeMenu.IsSupported) return -1;
         var window = new NativeWindow(_window.NativeHandle, f => _window.Chrome.AddMessageFilter((h, m, w, l) => f(h, m, w, l)));
-        NativeMenu.Show(path, window, (int)(at.X * _window.Scale), (int)(at.Y * _window.Scale));
+        var chosen = NativeMenu.Show(path, window, (int)(at.X * _window.Scale), (int)(at.Y * _window.Scale), customItems);
         Root.RequestRedraw();
+        return chosen;
     }
     public ILoggerFactory LoggerFactory { get; }
     public UiRoot Root { get; }

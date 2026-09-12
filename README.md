@@ -23,8 +23,10 @@ that scans a 1.5 TB drive in ~5 seconds.
     a 1.3 TB drive in ~3.6 s.
   - `generic-walk` – portable parallel directory walk on top of `FileSystemEnumerator`. Works
     everywhere; ~15 s (warm cache) for the same drive.
-- Context menu: open in file manager, copy path, zoom, move to Recycle Bin (Windows) / delete.
-  Shift+right-click opens the real Explorer menu on Windows (shell extensions included).
+- Right-click on Windows opens the real Explorer menu (shell extensions, "Open with", "Send to",
+  "Properties") with DiskLens' zoom/reveal items on top; deletions made there update the tree.
+  Shift+right-click (or right-click elsewhere) gives DiskLens' own menu: open, copy path, zoom,
+  Recycle Bin / delete.
 - Custom title bar on Windows (drag, Snap Layouts, double-click maximise all still work), dark and
   light theme, DPI aware. Event-driven render loop: 0 wake-ups when idle, partial repaints on hover.
 

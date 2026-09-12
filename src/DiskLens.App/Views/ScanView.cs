@@ -3,6 +3,7 @@ using DiskLens.App.Controls;
 using DiskLens.App.Shell;
 using DiskLens.Core;
 using DiskLens.Core.Model;
+using DiskLens.Core.Platform;
 using DiskLens.Core.Scanning;
 using DiskLens.UI.Animation;
 using DiskLens.UI.Elements;
@@ -68,10 +69,14 @@ public sealed class ScanView : Element
         UpdateStatus();
     }
 
-    private void ShowContextMenu(int node, SKPoint at, bool native)
+    /// <summary>
+    /// Right-click: on Windows the Explorer menu (with our zoom items on top) is the default; our own
+    /// menu is one Shift away. Elsewhere our menu is all there is.
+    /// </summary>
+    private void ShowContextMenu(int node, SKPoint at, bool alternate)
     {
         var tree = _vm.Tree;
-        if (native && _shell.NativeMenu.IsSupported)
+        if (_shell.NativeMenu.IsSupported && !alternate && node != FsTree.Root)
         {
             ShowNativeMenu(node, at);
             return;
@@ -95,7 +100,7 @@ public sealed class ScanView : Element
         if (_shell.NativeMenu.IsSupported && node != FsTree.Root)
         {
             items.Add(MenuItem.Separator);
-            items.Add(new("Explorer menu…", Icon.Settings, () => ShowNativeMenu(node, at), Shortcut: "Shift+Right-click"));
+            items.Add(new("Explorer menu…", Icon.Settings, () => ShowNativeMenu(node, at), Shortcut: "Right-click"));
         }
         items.Add(MenuItem.Separator);
         var deleteLabel = _shell.Files.SupportsRecycleBin ? "Move to Recycle Bin" : "Delete permanently";
@@ -106,10 +111,60 @@ public sealed class ScanView : Element
 
     private void ShowNativeMenu(int node, SKPoint at)
     {
-        // Runs modally on the UI thread; anything the user does in there (delete, rename) happens
-        // outside our tree, so offer a rescan hint afterwards.
-        _shell.ShowNativeMenu(_vm.Tree.FullPath(node), at);
-        if (_vm.Session.IsFinished) _status.Text = "Changes made through the Explorer menu show up after a rescan (F5).";
+        var tree = _vm.Tree;
+        var path = tree.FullPath(node);
+        var isDir = tree.IsDirectory(node);
+
+        // Our items on top of the shell menu; the rest (open, copy path, delete, properties...) is Explorer's.
+        var custom = new List<NativeMenuItem>();
+        var actions = new List<Action>();
+        if (isDir)
+        {
+            custom.Add(new NativeMenuItem("Zoom treemap here", IsEnabled: node != _vm.ZoomRoot));
+            actions.Add(() => _vm.ZoomRoot = node);
+        }
+        if (_vm.ZoomRoot != FsTree.Root)
+        {
+            custom.Add(new NativeMenuItem("Zoom out"));
+            actions.Add(_vm.ZoomOut);
+        }
+        custom.Add(new NativeMenuItem("Reveal in tree"));
+        actions.Add(() => _vm.Reveal(node));
+
+        // Runs modally on the UI thread.
+        var chosen = _shell.ShowNativeMenu(path, at, custom);
+        if (chosen >= 0 && chosen < actions.Count)
+        {
+            actions[chosen]();
+            return;
+        }
+
+        // Explorer commands run outside our tree. Deletions are the common case and easy to detect:
+        // if the entry is gone shortly after the menu closes, drop it from the tree.
+        if (_vm.Session.IsFinished) _ = WatchForRemovalAsync(node, path, isDir);
+    }
+
+    private async Task WatchForRemovalAsync(int node, string path, bool isDir)
+    {
+        for (var attempt = 0; attempt < 8; attempt++)
+        {
+            await Task.Delay(250);
+            var exists = isDir ? Directory.Exists(path) : File.Exists(path);
+            if (exists) continue;
+            _shell.Post(() =>
+            {
+                if (_vm.Tree.HasFlag(node, NodeFlags.Deleted)) return;
+                var parent = _vm.Tree.Parent(node);
+                _vm.Session.Builder.RemoveSubtree(node);
+                if (_vm.ZoomRoot == node || IsUnder(_vm.ZoomRoot, node)) _vm.ZoomRoot = parent;
+                if (_vm.Selected == node) _vm.Selected = parent;
+                _vm.NotifyDataChanged();
+                UpdateStatus();
+            });
+            return;
+        }
+        // Renames, edits etc. are not tracked – a rescan picks them up.
+        _shell.Post(() => { if (_vm.Session.IsFinished) _status.Text = "Changes made through the Explorer menu show up after a rescan (F5)."; });
     }
 
     private void Reveal(int node)

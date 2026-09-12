@@ -3,6 +3,18 @@
 All notable changes to DiskLens. The format follows [Keep a Changelog](https://keepachangelog.com/);
 versions follow [SemVer](https://semver.org/).
 
+## [0.2.1] – 2026-09-12
+
+### Changed
+- **Right-click now opens the Explorer menu** on Windows, with DiskLens' *Zoom treemap here* /
+  *Zoom out* / *Reveal in tree* merged in on top. DiskLens' own menu moved to Shift+right-click.
+- Files deleted through the Explorer menu disappear from the tree without a rescan.
+
+### Fixed
+- The Explorer menu did nothing in the published (trimmed) build: trimming disables classic COM
+  interop. The shell integration now uses source-generated COM (`GeneratedComInterface`), which
+  is trim-safe.
+
 ## [0.2.0] – 2026-09-12
 
 Performance release: same features, roughly a third of the memory, a third less scan time, and a
