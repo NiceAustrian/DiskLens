@@ -1,4 +1,4 @@
-using DiskLens.App.Views;
+using DiskLens.Presentation.Views;
 using DiskLens.Core;
 using DiskLens.Core.Model;
 using DiskLens.UI.Elements;
@@ -8,7 +8,7 @@ using DiskLens.UI.Rendering;
 using DiskLens.UI.Widgets;
 using SkiaSharp;
 
-namespace DiskLens.App.Controls;
+namespace DiskLens.Presentation.Controls;
 
 /// <summary>
 /// TreeSize-style directory tree: a virtualised flat list of the expanded nodes with size, share

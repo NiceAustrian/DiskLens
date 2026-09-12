@@ -1,7 +1,7 @@
 using System.Collections.Frozen;
 using SkiaSharp;
 
-namespace DiskLens.App.Controls;
+namespace DiskLens.Presentation.Controls;
 
 public enum FileCategory { Other, Image, Video, Audio, Archive, Document, Code, Binary, DiskImage, Database, Directory }
 

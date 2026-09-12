@@ -28,7 +28,7 @@ public sealed record WindowConfig(string Title, int Width = 1280, int Height = 8
 /// rendering straight into the default framebuffer, and input translation. Idle frames are skipped
 /// so the app sits at ~0 % CPU when nothing moves.
 /// </summary>
-public sealed class AppWindow : IDisposable
+public sealed class AppWindow : IAppHost, IDisposable
 {
     private readonly WindowConfig _config;
     private readonly ILogger _logger;
@@ -65,6 +65,8 @@ public sealed class AppWindow : IDisposable
 
     /// <summary>The OS window handle (HWND on Windows), or 0.</summary>
     public nint NativeHandle => OperatingSystem.IsWindows() ? _window?.Native?.Win32?.Hwnd ?? 0 : 0;
+
+    public bool IsTouch => false;
 
     /// <summary>Raised once the window and its chrome exist; the app wires its title bar here.</summary>
     public event Action? Loaded;

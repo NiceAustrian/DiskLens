@@ -1,5 +1,5 @@
-using DiskLens.App.Controls;
-using DiskLens.App.Shell;
+using DiskLens.Presentation.Controls;
+using DiskLens.Presentation.Shell;
 using DiskLens.Core.Platform;
 using DiskLens.Core.Scanning;
 using DiskLens.UI.Elements;
@@ -9,7 +9,7 @@ using DiskLens.UI.Widgets;
 using Microsoft.Extensions.Logging;
 using SkiaSharp;
 
-namespace DiskLens.App.Views;
+namespace DiskLens.Presentation.Views;
 
 /// <summary>Start screen: drive tiles plus a free-form folder input.</summary>
 public sealed class HomeView : Element

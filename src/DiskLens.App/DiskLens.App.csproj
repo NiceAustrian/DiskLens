@@ -24,11 +24,9 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Assets/icon-256.png" LogicalName="icon-256.png" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="../DiskLens.Core/DiskLens.Core.csproj" />
-    <ProjectReference Include="../DiskLens.UI/DiskLens.UI.csproj" />
+    <ProjectReference Include="../DiskLens.UI.Desktop/DiskLens.UI.Desktop.csproj" />
+    <ProjectReference Include="../DiskLens.Presentation/DiskLens.Presentation.csproj" />
     <ProjectReference Include="../DiskLens.Scanners.Generic/DiskLens.Scanners.Generic.csproj" />
     <ProjectReference Include="../DiskLens.Scanners.Windows/DiskLens.Scanners.Windows.csproj" />
     <ProjectReference Include="../DiskLens.Scanners.Posix/DiskLens.Scanners.Posix.csproj" />

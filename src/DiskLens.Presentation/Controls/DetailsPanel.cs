@@ -1,4 +1,4 @@
-using DiskLens.App.Views;
+using DiskLens.Presentation.Views;
 using DiskLens.Core;
 using DiskLens.Core.Model;
 using DiskLens.Core.Stats;
@@ -9,7 +9,7 @@ using DiskLens.UI.Rendering;
 using DiskLens.UI.Widgets;
 using SkiaSharp;
 
-namespace DiskLens.App.Controls;
+namespace DiskLens.Presentation.Controls;
 
 /// <summary>
 /// Details for the selected node: headline numbers, a by-type breakdown and the largest files.

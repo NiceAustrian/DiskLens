@@ -6,7 +6,7 @@ using DiskLens.UI.Input;
 using DiskLens.UI.Rendering;
 using SkiaSharp;
 
-namespace DiskLens.App.Controls;
+namespace DiskLens.Presentation.Controls;
 
 /// <summary>A drive card: icon, label, file system, usage bar and free space. Lifts on hover.</summary>
 public sealed class DriveTile : Element

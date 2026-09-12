@@ -1,6 +1,6 @@
 using System.Diagnostics;
-using DiskLens.App.Controls;
-using DiskLens.App.Shell;
+using DiskLens.Presentation.Controls;
+using DiskLens.Presentation.Shell;
 using DiskLens.Core;
 using DiskLens.Core.Model;
 using DiskLens.Core.Platform;
@@ -13,7 +13,7 @@ using DiskLens.UI.Rendering;
 using DiskLens.UI.Widgets;
 using SkiaSharp;
 
-namespace DiskLens.App.Views;
+namespace DiskLens.Presentation.Views;
 
 /// <summary>
 /// The analysis screen: toolbar with breadcrumb and scan status, tree on the left, treemap and

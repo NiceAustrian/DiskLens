@@ -2,9 +2,11 @@
   <Folder Name="/src/">
     <Project Path="src/DiskLens.App/DiskLens.App.csproj" />
     <Project Path="src/DiskLens.Core/DiskLens.Core.csproj" />
+    <Project Path="src/DiskLens.Presentation/DiskLens.Presentation.csproj" />
     <Project Path="src/DiskLens.Scanners.Generic/DiskLens.Scanners.Generic.csproj" />
     <Project Path="src/DiskLens.Scanners.Posix/DiskLens.Scanners.Posix.csproj" />
     <Project Path="src/DiskLens.Scanners.Windows/DiskLens.Scanners.Windows.csproj" />
+    <Project Path="src/DiskLens.UI.Desktop/DiskLens.UI.Desktop.csproj" />
     <Project Path="src/DiskLens.UI/DiskLens.UI.csproj" />
   </Folder>
   <Folder Name="/tests/">

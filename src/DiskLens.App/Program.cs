@@ -1,4 +1,4 @@
-using DiskLens.App.Shell;
+using DiskLens.Presentation.Shell;
 using DiskLens.Core;
 using DiskLens.Scanners.Generic;
 using DiskLens.Scanners.Posix;
@@ -31,7 +31,7 @@ static class Program
         else
             builder.Services.AddPosixScanners();
 
-        builder.Services.AddSingleton(new WindowConfig("DiskLens", 1360, 860) { IconPng = AppAssets.IconPng });
+        builder.Services.AddSingleton(new WindowConfig("DiskLens", 1360, 860) { IconPng = DiskLens.Presentation.PresentationAssets.IconPng });
         builder.Services.AddSingleton(sp => new UiRoot(args.Contains("--light") ? Theme.Light : Theme.Dark));
         builder.Services.AddSingleton(sp => new AppWindow(
             sp.GetRequiredService<WindowConfig>(),
@@ -82,20 +82,6 @@ static class Program
         shell.Attach(window, args.FirstOrDefault(a => !a.StartsWith('-')));
         window.Run();
         return 0;
-    }
-}
-
-static class AppAssets
-{
-    public static byte[] IconPng
-    {
-        get
-        {
-            using var s = typeof(AppAssets).Assembly.GetManifestResourceStream("icon-256.png")!;
-            using var ms = new MemoryStream();
-            s.CopyTo(ms);
-            return ms.ToArray();
-        }
     }
 }
 

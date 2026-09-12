@@ -1,4 +1,4 @@
-using DiskLens.App.Views;
+using DiskLens.Presentation.Views;
 using DiskLens.Core;
 using DiskLens.Core.Layout;
 using DiskLens.Core.Model;
@@ -8,7 +8,7 @@ using DiskLens.UI.Input;
 using DiskLens.UI.Rendering;
 using SkiaSharp;
 
-namespace DiskLens.App.Controls;
+namespace DiskLens.Presentation.Controls;
 
 /// <summary>
 /// Nested squarified treemap. Directories are drawn as labelled frames, files as shaded tiles

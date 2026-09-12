@@ -1,4 +1,4 @@
-using DiskLens.App.Views;
+using DiskLens.Presentation.Views;
 using DiskLens.Core.Platform;
 using DiskLens.Core.Scanning;
 using DiskLens.UI.Animation;
@@ -11,7 +11,7 @@ using DiskLens.UI.Widgets;
 using Microsoft.Extensions.Logging;
 using SkiaSharp;
 
-namespace DiskLens.App.Shell;
+namespace DiskLens.Presentation.Shell;
 
 /// <summary>
 /// The application frame: title bar with navigation, a content host that fades between views, and
@@ -26,7 +26,7 @@ public sealed class AppShell
     private readonly IconButton _themeToggle = new(Icon.Sun, "Toggle theme");
     private readonly Row _bar = new() { Gap = 10, Padding = new Thickness(12, 0, 0, 0), FixedHeight = TitleBarHeight };
     private Element? _current;
-    private AppWindow? _window;
+    private IAppHost? _window;
     private ScanSession? _session;
     private CaptionButtons? _captionButtons;
 
@@ -78,9 +78,15 @@ public sealed class AppShell
     /// <summary>Runs <paramref name="action"/> on the UI thread.</summary>
     public void Post(Action action) => _window?.Post(action);
 
+    /// <summary>The host this shell is attached to (null before <see cref="Attach"/>).</summary>
+    public IAppHost? Host => _window;
+
+    /// <summary>Touch hosts get larger targets and different gestures.</summary>
+    public bool IsTouch => _window?.IsTouch ?? false;
+
     public void Exit() => _window?.Close();
 
-    public void Attach(AppWindow window, string? initialPath = null)
+    public void Attach(IAppHost window, string? initialPath = null)
     {
         _window = window;
         Root.SetContent(BuildFrame());
@@ -209,7 +215,7 @@ public sealed class AppShell
     /// <summary>The app icon, drawn from the embedded PNG.</summary>
     private sealed class AppIcon : Element
     {
-        private static readonly Lazy<SKImage?> Image = new(() => SKImage.FromEncodedData(AppAssets.IconPng));
+        private static readonly Lazy<SKImage?> Image = new(() => SKImage.FromEncodedData(PresentationAssets.IconPng));
 
         public AppIcon() => IsHitTestVisible = true;
 

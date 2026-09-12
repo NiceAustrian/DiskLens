@@ -1,7 +1,7 @@
 using DiskLens.Core.Model;
 using DiskLens.Core.Scanning;
 
-namespace DiskLens.App.Views;
+namespace DiskLens.Presentation.Views;
 
 /// <summary>
 /// State shared by the tree list, the treemap and the details panel: which node is selected,
