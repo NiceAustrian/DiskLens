@@ -25,7 +25,7 @@ if (OperatingSystem.IsWindows())
 else
     builder.Services.AddPosixScanners();
 
-builder.Services.AddSingleton(new WindowConfig("DiskLens", 1360, 860));
+builder.Services.AddSingleton(new WindowConfig("DiskLens", 1360, 860) { IconPng = AppAssets.IconPng });
 builder.Services.AddSingleton(sp => new UiRoot(args.Contains("--light") ? Theme.Light : Theme.Dark));
 builder.Services.AddSingleton(sp => new AppWindow(
     sp.GetRequiredService<WindowConfig>(),
@@ -62,6 +62,20 @@ var window = host.Services.GetRequiredService<AppWindow>();
 var shell = host.Services.GetRequiredService<AppShell>();
 shell.Attach(window, args.FirstOrDefault(a => !a.StartsWith('-')));
 window.Run();
+
+static class AppAssets
+{
+    public static byte[] IconPng
+    {
+        get
+        {
+            using var s = typeof(AppAssets).Assembly.GetManifestResourceStream("icon-256.png")!;
+            using var ms = new MemoryStream();
+            s.CopyTo(ms);
+            return ms.ToArray();
+        }
+    }
+}
 
 static partial class ConsoleAttach
 {

@@ -1,4 +1,9 @@
+<p align="center"><img src="docs/icon.png" width="96" alt="DiskLens"></p>
+
 # DiskLens
+
+[![CI](https://github.com/NiceAustrian/DiskLens/actions/workflows/ci.yml/badge.svg)](https://github.com/NiceAustrian/DiskLens/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Disk space analyser in the spirit of TreeSize / WizTree / WinDirStat – C# on .NET 10, with its own
 GPU-rendered UI (SkiaSharp + Silk.NET, no UI framework), cross-platform, and an NTFS MFT reader
@@ -19,7 +24,8 @@ that scans a 1.5 TB drive in ~5 seconds.
   - `generic-walk` – portable parallel directory walk on top of `FileSystemEnumerator`. Works
     everywhere; ~15 s for the same drive.
 - Context menu: open in file manager, copy path, zoom, move to Recycle Bin (Windows) / delete.
-- Dark and light theme, DPI aware, idle at 0 % CPU.
+- Custom title bar on Windows (drag, Snap Layouts, double-click maximise all still work), dark and
+  light theme, DPI aware, idle at 0 % CPU.
 
 ## Build & run
 
@@ -45,6 +51,7 @@ src/
   DiskLens.UI                the toolkit: window host, element tree, flex layout, widgets, animation
   DiskLens.App               composition root (Generic Host + DI), shell, views, treemap/tree controls
 tests/DiskLens.Tests
+tools/DiskLens.IconGen       renders the app icon (PNG + ICO) from code
 ```
 
 ### Model

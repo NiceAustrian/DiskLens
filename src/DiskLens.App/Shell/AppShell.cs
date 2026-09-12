@@ -24,8 +24,12 @@ public sealed class AppShell
     private readonly Label _subtitle = new("") { StyleSelector = t => t.Small, Ellipsis = Ellipsis.Middle };
     private readonly IconButton _back = new(Icon.ArrowLeft, "Back to drives");
     private readonly IconButton _themeToggle = new(Icon.Sun, "Toggle theme");
+    private readonly Row _bar = new() { Gap = 10, Padding = new Thickness(12, 0, 0, 0), FixedHeight = TitleBarHeight };
     private Element? _current;
     private AppWindow? _window;
+    private CaptionButtons? _captionButtons;
+
+    private const float TitleBarHeight = 54;
 
     public AppShell(
         IVolumeService volumes,
@@ -64,6 +68,7 @@ public sealed class AppShell
         _window = window;
         Root.SetContent(BuildFrame());
         Root.KeyDown += OnGlobalKey;
+        window.Loaded += OnWindowLoaded;
         ShowHome();
         if (initialPath is not null && Directory.Exists(initialPath))
         {
@@ -73,20 +78,41 @@ public sealed class AppShell
         }
     }
 
+    /// <summary>With a custom frame, our title bar becomes the window caption: draggable, with OS buttons.</summary>
+    private void OnWindowLoaded()
+    {
+        var chrome = _window!.Chrome;
+        if (!chrome.IsCustomFrame) return;
+        _captionButtons = new CaptionButtons(chrome) { FixedHeight = TitleBarHeight };
+        _bar.Add(_captionButtons);
+        chrome.CaptionHitTest = CaptionHitTest;
+        Root.RequestLayout();
+    }
+
+    private CaptionHit CaptionHitTest(SKPoint p)
+    {
+        if (p.Y >= TitleBarHeight) return CaptionHit.Client;
+        var el = Root.HitTest(p);
+        if (el is CaptionButtons cb) return cb.HitAt(p);
+        // Anything interactive (buttons, popups) stays client; passive chrome is draggable caption.
+        return el is null or TitleBarBackground or Flex or Label or AppIcon ? CaptionHit.Caption : CaptionHit.Client;
+    }
+
     private Element BuildFrame()
     {
-        var titleBlock = new Column { Gap = 1, CrossAlign = CrossAlign.Start };
+        var titleBlock = new Column { Gap = 1, CrossAlign = CrossAlign.Start, Flex = 1, MainAlign = MainAlign.Center };
         titleBlock.Add(_title);
         titleBlock.Add(_subtitle);
 
-        var bar = new Row { Gap = 10, Padding = new Thickness(16, 10), FixedHeight = 58 };
-        bar.Add(_back);
-        bar.Add(titleBlock);
-        bar.Add(new Spacer());
-        bar.Add(_themeToggle);
+        _back.Margin = new Thickness(0, 0, 0, 0);
+        _bar.Add(new AppIcon { FixedWidth = 22, FixedHeight = 22, Margin = new Thickness(4, 0, 0, 0) });
+        _bar.Add(_back);
+        _bar.Add(titleBlock);
+        _bar.Add(_themeToggle);
+        _themeToggle.Margin = new Thickness(0, 0, 8, 0);
 
         var frame = new Column();
-        frame.Add(new TitleBarBackground { FixedHeight = 58, Content = bar });
+        frame.Add(new TitleBarBackground { FixedHeight = TitleBarHeight, Content = _bar });
         _contentHost.Flex = 1;
         _contentHost.ClipsChildren = true;
         frame.Add(_contentHost);
@@ -144,6 +170,22 @@ public sealed class AppShell
         var dark = !Root.Theme.IsDark;
         Root.SetTheme(dark ? Theme.Dark : Theme.Light);
         _themeToggle.Icon = dark ? Icon.Sun : Icon.Moon;
+        _window?.Chrome.SetDarkMode(dark);
+    }
+
+    /// <summary>The app icon, drawn from the embedded PNG.</summary>
+    private sealed class AppIcon : Element
+    {
+        private static readonly Lazy<SKImage?> Image = new(() => SKImage.FromEncodedData(AppAssets.IconPng));
+
+        public AppIcon() => IsHitTestVisible = true;
+
+        protected override void OnDraw(SKCanvas canvas)
+        {
+            if (Image.Value is not { } img) return;
+            using var paint = new SKPaint { IsAntialias = true };
+            canvas.DrawImage(img, Bounds, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear), paint);
+        }
     }
 
     private void OnGlobalKey(KeyEvent e)

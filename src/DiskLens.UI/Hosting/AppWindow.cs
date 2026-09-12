@@ -14,7 +14,14 @@ using SilkKey = Silk.NET.Input.Key;
 
 namespace DiskLens.UI.Hosting;
 
-public sealed record WindowConfig(string Title, int Width = 1280, int Height = 800, int MinWidth = 720, int MinHeight = 480);
+public sealed record WindowConfig(string Title, int Width = 1280, int Height = 800, int MinWidth = 720, int MinHeight = 480)
+{
+    /// <summary>PNG bytes for the window/taskbar icon (any size; 256 px is ideal).</summary>
+    public byte[]? IconPng { get; init; }
+
+    /// <summary>Draw our own title bar where the platform allows it (currently Windows).</summary>
+    public bool CustomTitleBar { get; init; } = true;
+}
 
 /// <summary>
 /// Hosts a <see cref="UiRoot"/> in a native window: GLFW window + OpenGL context via Silk.NET, Skia
@@ -51,6 +58,12 @@ public sealed class AppWindow : IDisposable
     public float Scale => _scale;
     public int ThreadId { get; private set; }
 
+    /// <summary>Frame integration. Available after the window has loaded.</summary>
+    public IWindowChrome Chrome { get; private set; } = null!;
+
+    /// <summary>Raised once the window and its chrome exist; the app wires its title bar here.</summary>
+    public event Action? Loaded;
+
     /// <summary>Queues work for the UI thread and wakes the loop.</summary>
     public void Post(Action action)
     {
@@ -78,6 +91,7 @@ public sealed class AppWindow : IDisposable
             Samples = 0,
             WindowBorder = WindowBorder.Resizable,
             TransparentFramebuffer = false,
+            IsVisible = true,
         };
 
         _window = Window.Create(options);
@@ -122,8 +136,30 @@ public sealed class AppWindow : IDisposable
 
         if (_input.Keyboards.Count > 0) Root.Clipboard = new KeyboardClipboard(_input.Keyboards[0]);
 
+        if (_config.IconPng is { } png) SetIcon(window, png);
+
+        Chrome = _config.CustomTitleBar && OperatingSystem.IsWindows() && window.Native?.Win32 is { } w32
+            ? new WindowsChrome(w32.Hwnd, () => _scale)
+            : new NativeChrome(() => window.WindowState = WindowState.Minimized,
+                               () => window.WindowState = window.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized,
+                               window.Close,
+                               () => window.WindowState == WindowState.Maximized);
+        Chrome.Changed += Root.RequestRedraw;
+        Chrome.SetDarkMode(Root.Theme.IsDark);
+        Loaded?.Invoke();
+
         Root.Resize(new SKSize(window.Size.X / _scale, window.Size.Y / _scale), _scale);
         _surfaceDirty = true;
+    }
+
+    private static void SetIcon(IWindow window, byte[] png)
+    {
+        using var bitmap = SKBitmap.Decode(png);
+        if (bitmap is null) return;
+        using var rgba = bitmap.Copy(SKColorType.Rgba8888);
+        var pixels = rgba.Bytes;   // straight RGBA, as GLFW expects
+        var image = new Silk.NET.Core.RawImage(rgba.Width, rgba.Height, new Memory<byte>(pixels));
+        window.SetWindowIcon(ref image);
     }
 
     private sealed class KeyboardClipboard(IKeyboard keyboard) : Widgets.IClipboard
