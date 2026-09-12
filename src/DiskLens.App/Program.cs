@@ -69,7 +69,7 @@ if (args.Contains("--bench"))
         distinct.Add(n);
     }
     Console.WriteLine($"Names: {tree.Count:N0} nodes, avg {chars / (double)tree.Count:0.0} chars, {distinct.Count:N0} distinct ({100.0 * distinct.Count / tree.Count:0.0}%), {nonAscii:N0} non-ASCII, pool {tree.Names.Bytes / 1024 / 1024} MB");
-    Console.WriteLine($"Columns: ~{tree.Count * 92L / 1024 / 1024} MB (92 B/node)");
+    Console.WriteLine($"Columns: ~{(tree.Count * 40L + tree.DirectoryCount * 32L) / 1024 / 1024} MB (40 B/node + 32 B/dir, {tree.DirectoryCount:N0} dirs)");
     return;
 }
 
