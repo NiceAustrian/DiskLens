@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Android.App;
 using Android.Content;
 using Android.OS;
 using Android.OS.Storage;
@@ -116,9 +117,10 @@ public sealed class AndroidStorageAccess(Context context) : IElevationService
     {
         try
         {
+            // Started from the activity context so Back returns to DiskLens, not the launcher.
             var intent = new Intent(Android.Provider.Settings.ActionManageAppAllFilesAccessPermission,
                 Android.Net.Uri.Parse("package:" + context.PackageName));
-            intent.AddFlags(ActivityFlags.NewTask);
+            if (context is not Activity) intent.AddFlags(ActivityFlags.NewTask);
             context.StartActivity(intent);
             return true;
         }
@@ -127,7 +129,7 @@ public sealed class AndroidStorageAccess(Context context) : IElevationService
             try
             {
                 var intent = new Intent(Android.Provider.Settings.ActionManageAllFilesAccessPermission);
-                intent.AddFlags(ActivityFlags.NewTask);
+                if (context is not Activity) intent.AddFlags(ActivityFlags.NewTask);
                 context.StartActivity(intent);
                 return true;
             }

@@ -37,7 +37,7 @@ public class MainActivity : Activity
         services.AddLogging(b => { b.AddProvider(new LogcatLoggerProvider()); b.SetMinimumLevel(LogLevel.Information); });
         services.AddDiskLensCore();
         services.AddScanner<WalkScanner>();            // portable walk; no DriveInfo provider on Android
-        services.AddAndroidPlatform(ApplicationContext!);
+        services.AddAndroidPlatform(this);   // activity context: settings pages opened from here return to us
         services.AddSingleton(_ => new UiRoot(IsSystemDark() ? DiskLens.UI.Rendering.Theme.Dark : DiskLens.UI.Rendering.Theme.Light));
         services.AddSingleton<AppShell>();
         _services = services.BuildServiceProvider();

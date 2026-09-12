@@ -3,6 +3,12 @@
 All notable changes to DiskLens. The format follows [Keep a Changelog](https://keepachangelog.com/);
 versions follow [SemVer](https://semver.org/).
 
+## [0.3.1] – 2026-09-13
+
+### Fixed
+- Android: returning from the "All files access" settings page lands back in DiskLens (the
+  settings intent is started from the activity, not a new task); the banner disappears on return.
+
 ## [0.3.0] – 2026-09-13
 
 ### Added
