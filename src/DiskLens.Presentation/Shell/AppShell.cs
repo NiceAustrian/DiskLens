@@ -137,7 +137,7 @@ public sealed class AppShell
         _bar.Add(_themeToggle);
         _themeToggle.Margin = new Thickness(0, 0, 8, 0);
 
-        var frame = new Column();
+        var frame = new SafeAreaColumn(Root);
         frame.Add(new TitleBarBackground { FixedHeight = TitleBarHeight, Content = _bar });
         _contentHost.Flex = 1;
         _contentHost.ClipsChildren = true;
@@ -245,6 +245,26 @@ public sealed class AppShell
             if (outgoing is not null) outgoing.Opacity = 1 - t.Value;
             incoming.Invalidate();
             return t.IsActive;
+        }
+    }
+
+    /// <summary>The outer frame keeps content out from under status/gesture bars on phones.</summary>
+    private sealed class SafeAreaColumn(UiRoot root) : Flex(Axis.Vertical)
+    {
+        protected override void ArrangeContent(SKRect bounds)
+        {
+            Padding = root.SafeInsets;
+            base.ArrangeContent(bounds);
+        }
+
+        protected override void OnDraw(SKCanvas canvas)
+        {
+            // Paint the inset strips in the title bar colour so the status bar blends in.
+            if (root.SafeInsets.Top > 0)
+            {
+                using var paint = new SKPaint { Color = Theme.Surface };
+                canvas.DrawRect(Bounds.Left, Bounds.Top, Bounds.Width, root.SafeInsets.Top, paint);
+            }
         }
     }
 

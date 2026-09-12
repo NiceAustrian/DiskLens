@@ -45,7 +45,8 @@ public sealed class AndroidVolumeProvider(Context context) : IVolumeProvider
                 var label = volume.GetDescription(context) ?? (volume.IsPrimary ? "Internal storage" : "External storage");
                 var kind = volume.IsRemovable ? VolumeKind.Removable : VolumeKind.Fixed;
                 var (total, free) = ready ? Stat(dir) : (0L, 0L);
-                yield return new VolumeInfo(volume.IsPrimary ? "internal" : volume.Uuid ?? dir, dir, label, FileSystemOf(dir), kind, total, free, ready);
+                // Id doubles as the display name here – Android has no drive letters worth showing.
+                yield return new VolumeInfo(label, dir, "", FileSystemOf(dir), kind, total, free, ready);
             }
         }
 
@@ -54,14 +55,7 @@ public sealed class AndroidVolumeProvider(Context context) : IVolumeProvider
         if (primary is not null && seen.Add(primary))
         {
             var (total, free) = Stat(primary);
-            yield return new VolumeInfo("internal", primary, "Internal storage", FileSystemOf(primary), VolumeKind.Fixed, total, free);
-        }
-
-        var data = context.DataDir?.AbsolutePath ?? context.FilesDir?.ParentFile?.AbsolutePath;
-        if (data is not null && seen.Add(data))
-        {
-            var (total, free) = Stat(data);
-            yield return new VolumeInfo("appdata", data, "DiskLens app data", FileSystemOf(data), VolumeKind.Virtual, total, free);
+            yield return new VolumeInfo("Internal storage", primary, "", FileSystemOf(primary), VolumeKind.Fixed, total, free);
         }
     }
 

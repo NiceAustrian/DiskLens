@@ -113,6 +113,17 @@ public sealed class DiskLensView : SKGLSurfaceView, IAppHost
         _handler.PostDelayed(_wakeup, (long)Math.Max(1, seconds * 1000));
     }
 
+    public override WindowInsets? OnApplyWindowInsets(WindowInsets? insets)
+    {
+        if (insets is not null)
+        {
+            var bars = insets.GetInsets(WindowInsets.Type.SystemBars());
+            var t = new DiskLens.UI.Elements.Thickness(bars.Left / _scale, bars.Top / _scale, bars.Right / _scale, bars.Bottom / _scale);
+            RunOnGl(() => _root.SetSafeInsets(t));
+        }
+        return base.OnApplyWindowInsets(insets);
+    }
+
     // Input (UI thread → GL thread) -----------------------------------------------------------
     public override bool OnTouchEvent(MotionEvent? e)
     {

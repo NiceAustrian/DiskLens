@@ -48,6 +48,7 @@ public class MainActivity : Activity
 
         _shell = _services.GetRequiredService<AppShell>();
         _shell.Attach(_view);
+        ApplySystemBarStyle(root.Theme.IsDark);
         _hadAllFilesAccess = _services.GetRequiredService<IElevationService>().IsElevated;
     }
 
@@ -89,6 +90,16 @@ public class MainActivity : Activity
     {
         _services?.Dispose();
         base.OnDestroy();
+    }
+
+    /// <summary>Status/navigation bar icons must contrast with our title bar colour.</summary>
+    private void ApplySystemBarStyle(bool dark)
+    {
+        if (Window?.InsetsController is { } controller)
+        {
+            var light = dark ? 0 : (int)(WindowInsetsControllerAppearance.LightStatusBars | WindowInsetsControllerAppearance.LightNavigationBars);
+            controller.SetSystemBarsAppearance(light, (int)(WindowInsetsControllerAppearance.LightStatusBars | WindowInsetsControllerAppearance.LightNavigationBars));
+        }
     }
 
     private bool IsSystemDark() =>

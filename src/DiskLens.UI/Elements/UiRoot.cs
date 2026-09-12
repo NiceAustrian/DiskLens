@@ -89,6 +89,16 @@ public sealed class UiRoot : Element
     /// <summary>Raised when the host window changes size (after the new size is set).</summary>
     public event Action<SKSize>? Resized;
 
+    /// <summary>Areas covered by system UI (status bar, gesture bar, display cutout) in logical units.</summary>
+    public Thickness SafeInsets { get; private set; }
+
+    public void SetSafeInsets(Thickness insets)
+    {
+        if (insets.Equals(SafeInsets)) return;
+        SafeInsets = insets;
+        RequestLayout();
+    }
+
     public void RequestLayout() { _needsLayout = true; _needsRedraw = true; }
     public void RequestRedraw() => _needsRedraw = true;
 
