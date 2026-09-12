@@ -47,6 +47,7 @@ public sealed class ScanView : Element
         bar.Add(_stop);
         bar.Add(_rescan);
         bar.Add(_open);
+        _open.IsVisible = shell.Files.CanReveal;
         _stop.Activated += session.Cancel;
         _rescan.Activated += () => shell.StartScan(session.Target);
         _open.Activated += OpenSelected;
@@ -84,11 +85,10 @@ public sealed class ScanView : Element
         var isDir = tree.IsDirectory(node);
         var isRoot = node == FsTree.Root;
         var finished = _vm.Session.IsFinished;
-        var items = new List<MenuItem>
-        {
-            new(OperatingSystem.IsWindows() ? "Open in Explorer" : "Reveal in file manager", Icon.ExternalLink, () => Reveal(node)),
-            new("Copy path", Icon.Copy, () => Root?.Clipboard?.SetText(tree.FullPath(node)), Shortcut: "Ctrl+C"),
-        };
+        var items = new List<MenuItem>();
+        if (_shell.Files.CanReveal)
+            items.Add(new(OperatingSystem.IsWindows() ? "Open in Explorer" : "Reveal in file manager", Icon.ExternalLink, () => Reveal(node)));
+        items.Add(new("Copy path", Icon.Copy, () => Root?.Clipboard?.SetText(tree.FullPath(node)), Shortcut: _shell.IsTouch ? null : "Ctrl+C"));
         if (isDir)
         {
             items.Add(new("Zoom treemap here", Icon.Search, () => _vm.ZoomRoot = node, IsEnabled: node != _vm.ZoomRoot));

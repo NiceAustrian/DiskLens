@@ -261,6 +261,7 @@ public sealed class TreeList : Element
             SelectedRow = index;
             Vm.Selected = node;
             owner.Focus();
+            if (e.IsTouch && Tree.IsDirectory(node)) Toggle(node);   // no chevron precision on a phone
         }
 
         protected override void OnRowDoubleClick(int index, PointerEvent e)

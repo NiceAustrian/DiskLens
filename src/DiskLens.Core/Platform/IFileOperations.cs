@@ -6,6 +6,9 @@ public interface IFileOperations
     /// <summary>Whether <see cref="DeleteAsync"/> moves to a recycle bin / trash (true) or deletes permanently (false).</summary>
     bool SupportsRecycleBin { get; }
 
+    /// <summary>Whether <see cref="RevealInFileManager"/> does anything on this platform.</summary>
+    bool CanReveal { get; }
+
     /// <summary>Opens a directory, or reveals a file in its directory, in the platform file manager.</summary>
     void RevealInFileManager(string path, bool isDirectory);
 
@@ -17,6 +20,7 @@ public interface IFileOperations
 public sealed class GenericFileOperations : IFileOperations
 {
     public bool SupportsRecycleBin => false;
+    public bool CanReveal => true;
 
     public void RevealInFileManager(string path, bool isDirectory)
     {

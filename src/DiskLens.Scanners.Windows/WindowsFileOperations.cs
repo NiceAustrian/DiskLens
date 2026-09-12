@@ -11,6 +11,7 @@ namespace DiskLens.Scanners.Windows;
 public sealed class WindowsFileOperations : IFileOperations
 {
     public bool SupportsRecycleBin => true;
+    public bool CanReveal => true;
 
     public void RevealInFileManager(string path, bool isDirectory)
     {

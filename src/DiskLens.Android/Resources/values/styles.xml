@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- No action bar; dark window background so there is no white flash before the first frame. -->
+  <style name="DiskLensTheme" parent="@android:style/Theme.Material.NoActionBar">
+    <item name="android:windowBackground">#0C0E12</item>
+    <item name="android:statusBarColor">#0C0E12</item>
+    <item name="android:navigationBarColor">#0C0E12</item>
+    <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+  </style>
+</resources>

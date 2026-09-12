@@ -18,6 +18,14 @@ public class ScrollView : Element
     private bool _dragging;
     private bool _barHovered;
 
+    // Touch: finger drag with fling
+    private bool _touchDown, _touchDragging;
+    private float _touchStartY, _touchStartOffset, _touchLastY;
+    private double _touchLastTime;
+    private float _touchVelocity;          // logical px / s, positive = content moving up (offset increasing)
+    private Fling? _fling;
+    private const float TouchSlop = 10;
+
     public ScrollView()
     {
         ClipsChildren = true;
@@ -121,6 +129,27 @@ public class ScrollView : Element
 
     protected internal override void OnPointerMove(PointerEvent e)
     {
+        if (_touchDown)
+        {
+            var now = Environment.TickCount64 / 1000.0;
+            if (!_touchDragging && Math.Abs(e.Position.Y - _touchStartY) > TouchSlop && MaxOffset > 0)
+            {
+                _touchDragging = true;
+                Root?.TakeOverPointer(this);
+                ShowBar();
+            }
+            if (_touchDragging)
+            {
+                var dt = now - _touchLastTime;
+                if (dt > 0.001) _touchVelocity = (float)((_touchLastY - e.Position.Y) / dt);
+                _touchLastY = e.Position.Y;
+                _touchLastTime = now;
+                _offset.Jump(Math.Clamp(_touchStartOffset + (_touchStartY - e.Position.Y), 0, MaxOffset));
+                InvalidateLayout();
+                e.Handled = true;
+                return;
+            }
+        }
         if (_dragging)
         {
             var track = TrackRect();
@@ -143,6 +172,20 @@ public class ScrollView : Element
 
     protected internal override void OnPointerDown(PointerEvent e)
     {
+        if (e.IsTouch && e.Button == PointerButton.Left)
+        {
+            // Remember where the finger went down; a drag beyond the slop takes over from the child.
+            if (_fling is not null) { Root?.Animator.Stop(_fling); _fling = null; }
+            _touchDown = true;
+            _touchDragging = false;
+            _touchStartY = _touchLastY = e.Position.Y;
+            _touchStartOffset = _offset.Target;
+            _touchLastTime = Environment.TickCount64 / 1000.0;
+            _touchVelocity = 0;
+            // do not mark handled: the child gets its press as usual
+            base.OnPointerDown(e);
+            return;
+        }
         if (e.Button == PointerButton.Left && MaxOffset > 0 && TrackRect().Contains(e.Position))
         {
             var thumb = ThumbRect();
@@ -164,6 +207,22 @@ public class ScrollView : Element
 
     protected internal override void OnPointerUp(PointerEvent e)
     {
+        if (_touchDown)
+        {
+            _touchDown = false;
+            if (_touchDragging)
+            {
+                _touchDragging = false;
+                if (Math.Abs(_touchVelocity) > 50)
+                {
+                    _fling = new Fling(this, _touchVelocity);
+                    Animate(_fling);
+                }
+                else HideBarLater();
+                e.Handled = true;
+                return;
+            }
+        }
         if (_dragging)
         {
             _dragging = false;
@@ -178,6 +237,28 @@ public class ScrollView : Element
         _barHovered = false;
         HideBarLater();
         base.OnPointerExit();
+    }
+
+    /// <summary>Decelerating scroll after a finger lift.</summary>
+    private sealed class Fling(ScrollView view, float velocity) : IAnimation
+    {
+        private float _v = velocity;
+
+        public bool Tick(float dt)
+        {
+            _v *= MathF.Pow(0.05f, dt);        // ~95 % of the speed gone after one second
+            var next = view._offset.Value + _v * dt;
+            var clamped = Math.Clamp(next, 0, view.MaxOffset);
+            view._offset.Jump(clamped);
+            view.InvalidateLayout();
+            if (Math.Abs(_v) < 20 || clamped != next)
+            {
+                view._fling = null;
+                view.HideBarLater();
+                return false;
+            }
+            return true;
+        }
     }
 
     public override Element? HitTest(SKPoint p)

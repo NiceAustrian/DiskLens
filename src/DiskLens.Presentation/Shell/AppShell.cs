@@ -84,6 +84,9 @@ public sealed class AppShell
     /// <summary>Touch hosts get larger targets and different gestures.</summary>
     public bool IsTouch => _window?.IsTouch ?? false;
 
+    /// <summary>Whether Escape/Back has something to do (close a popup, leave the scan view). Safe to read from any thread.</summary>
+    public bool CanGoBack => _back.IsVisible || Root.Overlay.Children.Count > 0;
+
     public void Exit() => _window?.Close();
 
     public void Attach(IAppHost window, string? initialPath = null)

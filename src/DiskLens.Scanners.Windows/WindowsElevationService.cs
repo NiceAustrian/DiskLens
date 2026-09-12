@@ -19,6 +19,11 @@ public sealed class WindowsElevationService : IElevationService
 
     public bool CanRelaunchElevated => !IsElevated && Environment.ProcessPath is not null;
 
+    public ElevationPrompt? Prompt => IsElevated ? null : new(
+        "Faster scans available",
+        "As administrator, DiskLens reads the NTFS master file table directly – a whole drive in seconds instead of minutes.",
+        "Restart as administrator");
+
     public bool RelaunchElevated(string[] args)
     {
         var exe = Environment.ProcessPath;

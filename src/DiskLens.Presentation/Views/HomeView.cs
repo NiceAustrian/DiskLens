@@ -26,34 +26,37 @@ public sealed class HomeView : Element
         var scroll = Add(new ScrollView());
         var page = scroll.Add(new Column { Padding = new Thickness(32, 28), Gap = 18, MaxWidth = 1200 });
 
-        if (!shell.Elevation.IsElevated && shell.Elevation.CanRelaunchElevated)
-            page.Add(BuildElevationBanner());
+        if (shell.Elevation.Prompt is { } prompt && shell.Elevation.CanRelaunchElevated)
+            page.Add(BuildElevationBanner(prompt));
 
         page.Add(new Label("Drives") { StyleSelector = t => t.Heading });
         page.Add(_status);
         page.Add(_tiles);
 
-        page.Add(new Label("Folder") { StyleSelector = t => t.Heading, Margin = new Thickness(0, 16, 0, 0) });
-        var row = page.Add(new Row { Gap = 10 });
-        _path.Flex = 1;
-        row.Add(_path);
-        var go = row.Add(new Button("Scan folder", Icon.Search) { Style = ButtonStyle.Primary });
-        go.Activated += () => ScanPath(_path.Text);
-        _path.Submitted += ScanPath;
+        if (!shell.IsTouch)   // no soft-keyboard support in the toolkit yet; touch hosts pick volumes only
+        {
+            page.Add(new Label("Folder") { StyleSelector = t => t.Heading, Margin = new Thickness(0, 16, 0, 0) });
+            var row = page.Add(new Row { Gap = 10 });
+            _path.Flex = 1;
+            row.Add(_path);
+            var go = row.Add(new Button("Scan folder", Icon.Search) { Style = ButtonStyle.Primary });
+            go.Activated += () => ScanPath(_path.Text);
+            _path.Submitted += ScanPath;
+        }
 
         _ = LoadVolumesAsync();
     }
 
-    private Element BuildElevationBanner()
+    private Element BuildElevationBanner(ElevationPrompt prompt)
     {
         var card = new Box { Padding = new Thickness(16, 12), CornerRadius = 12 };
         card.Background = null;
         var row = card.Add(new Row { Gap = 14 });
         row.Add(new IconGlyph(Icon.Shield) { FixedWidth = 22, FixedHeight = 22 });
         var text = row.Add(new Column { Gap = 2, Flex = 1, CrossAlign = CrossAlign.Start });
-        text.Add(new Label("Faster scans available") { StyleSelector = t => t.BodyMedium });
-        text.Add(new Label("As administrator, DiskLens reads the NTFS master file table directly – a whole drive in seconds instead of minutes.") { StyleSelector = t => t.Small });
-        var btn = row.Add(new Button("Restart as administrator", Icon.Shield) { Style = ButtonStyle.Primary });
+        text.Add(new Label(prompt.Title) { StyleSelector = t => t.BodyMedium });
+        text.Add(new WrappedLabel(prompt.Message) { StyleSelector = t => t.Small });
+        var btn = row.Add(new Button(prompt.ButtonLabel, Icon.Shield) { Style = ButtonStyle.Primary });
         btn.Activated += () =>
         {
             if (_shell.Elevation.RelaunchElevated([])) _shell.Exit();

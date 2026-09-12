@@ -25,6 +25,8 @@ public sealed class UiRoot : Element
     private Element? _focused;
     private SKPoint _pointer;
     private PointerButton _pressedButton;
+    private bool _isTouch;
+    private bool _suppressClick;
     private double _lastClickTime;
     private SKPoint _lastClickPos;
     private int _clickCount;
@@ -180,24 +182,26 @@ public sealed class UiRoot : Element
         _pointer = position;
         if (_captured is not null)
         {
-            Bubble(_captured, e => e.OnPointerMove, new PointerEvent { Position = position, Button = _pressedButton, Modifiers = modifiers });
+            Bubble(_captured, e => e.OnPointerMove, new PointerEvent { Position = position, Button = _pressedButton, Modifiers = modifiers, IsTouch = _isTouch });
             return;
         }
         UpdateHover();
         if (_hovered is not null)
-            Bubble(_hovered, e => e.OnPointerMove, new PointerEvent { Position = position, Modifiers = modifiers });
+            Bubble(_hovered, e => e.OnPointerMove, new PointerEvent { Position = position, Modifiers = modifiers, IsTouch = _isTouch });
     }
 
-    public void DispatchPointerDown(SKPoint position, PointerButton button, Modifiers modifiers)
+    public void DispatchPointerDown(SKPoint position, PointerButton button, Modifiers modifiers, bool isTouch = false)
     {
         _pointer = position;
+        _isTouch = isTouch;
+        _suppressClick = false;
         HideTooltip();
         UpdateHover();
         var target = _hovered;
         if (target is null) return;
 
         var now = _clock.Elapsed.TotalSeconds;
-        var isDouble = now - _lastClickTime < 0.4 && SKPoint.Distance(position, _lastClickPos) < 6 && button == PointerButton.Left;
+        var isDouble = now - _lastClickTime < 0.4 && SKPoint.Distance(position, _lastClickPos) < (isTouch ? 32 : 6) && button == PointerButton.Left;
         _clickCount = isDouble ? _clickCount + 1 : 1;
         _lastClickTime = now;
         _lastClickPos = position;
@@ -212,10 +216,10 @@ public sealed class UiRoot : Element
         while (focusTarget is not null && !focusTarget.CanFocus) focusTarget = focusTarget.Parent;
         SetFocus(focusTarget);
 
-        Bubble(target, e => e.OnPointerDown, new PointerEvent { Position = position, Button = button, Modifiers = modifiers, ClickCount = _clickCount });
+        Bubble(target, e => e.OnPointerDown, new PointerEvent { Position = position, Button = button, Modifiers = modifiers, ClickCount = _clickCount, IsTouch = isTouch });
     }
 
-    public void DispatchPointerUp(SKPoint position, PointerButton button, Modifiers modifiers)
+    public void DispatchPointerUp(SKPoint position, PointerButton button, Modifiers modifiers, bool cancelled = false)
     {
         _pointer = position;
         var target = _captured ?? _hovered;
@@ -226,13 +230,14 @@ public sealed class UiRoot : Element
         _pressed = null;
         SetPressedVisual(wasPressed, false);
 
-        Bubble(target, e => e.OnPointerUp, new PointerEvent { Position = position, Button = button, Modifiers = modifiers });
+        Bubble(target, e => e.OnPointerUp, new PointerEvent { Position = position, Button = button, Modifiers = modifiers, IsTouch = _isTouch });
 
-        // A click is press + release on the same element.
+        // A click is press + release on the same element – unless a drag or long-press took over.
+        if (cancelled || _suppressClick) { _suppressClick = false; UpdateHover(); return; }
         var under = HitTest(position);
         if (wasPressed is not null && under is not null && (under == wasPressed || wasPressed.IsAncestorOf(under)))
         {
-            var ev = new PointerEvent { Position = position, Button = button, Modifiers = modifiers, ClickCount = _clickCount };
+            var ev = new PointerEvent { Position = position, Button = button, Modifiers = modifiers, ClickCount = _clickCount, IsTouch = _isTouch };
             if (_clickCount >= 2 && button == PointerButton.Left)
             {
                 Bubble(wasPressed, e => e.OnDoubleClick, ev);
@@ -244,6 +249,29 @@ public sealed class UiRoot : Element
             }
         }
         UpdateHover();
+    }
+
+    /// <summary>Touch long-press: delivered as a right-click to the pressed element; the following release is not a click.</summary>
+    public void DispatchLongPress(SKPoint position)
+    {
+        var target = _pressed ?? HitTest(position);
+        if (target is null) return;
+        _suppressClick = true;
+        SetPressedVisual(_pressed, false);
+        _pressed = null;
+        Bubble(target, e => e.OnClick, new PointerEvent { Position = position, Button = PointerButton.Right, IsTouch = true });
+    }
+
+    /// <summary>
+    /// Lets a container (a scroll view starting a drag) take the pointer away from the pressed child:
+    /// the child's press visual is cleared and the eventual release will not count as a click.
+    /// </summary>
+    public void TakeOverPointer(Element element)
+    {
+        _suppressClick = true;
+        SetPressedVisual(_pressed, false);
+        _pressed = null;
+        _captured = element;
     }
 
     public void DispatchPointerWheel(SKPoint position, SKPoint delta, Modifiers modifiers)

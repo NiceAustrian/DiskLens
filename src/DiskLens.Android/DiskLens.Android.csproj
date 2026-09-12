@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>30</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DiskLens.Droid</RootNamespace>
+    <AssemblyName>DiskLens.Android</AssemblyName>
+    <ApplicationId>dev.paullitsch.disklens</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
+    <ApplicationTitle>DiskLens</ApplicationTitle>
+    <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <TrimMode>partial</TrimMode>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AndroidUseInterpreter>false</AndroidUseInterpreter>
+  </PropertyGroup>
+
+  <!-- Local developer defaults; CI sets ANDROID_HOME / JAVA_HOME itself. -->
+  <PropertyGroup>
+    <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and '$(ANDROID_HOME)' == '' and Exists('C:\Android\Sdk')">C:\Android\Sdk</AndroidSdkDirectory>
+    <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' and '$(JAVA_HOME)' == '' and Exists('C:\Program Files\Eclipse Adoptium\jdk-21.0.7.6-hotspot')">C:\Program Files\Eclipse Adoptium\jdk-21.0.7.6-hotspot</JavaSdkDirectory>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../DiskLens.Core/DiskLens.Core.csproj" />
+    <ProjectReference Include="../DiskLens.UI/DiskLens.UI.csproj" />
+    <ProjectReference Include="../DiskLens.Presentation/DiskLens.Presentation.csproj" />
+    <ProjectReference Include="../DiskLens.Scanners.Generic/DiskLens.Scanners.Generic.csproj" />
+    <ProjectReference Include="../DiskLens.Scanners.Android/DiskLens.Scanners.Android.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.Views" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+</Project>

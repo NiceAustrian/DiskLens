@@ -43,6 +43,38 @@ using (var ico = new BinaryWriter(File.Create(Path.Combine(outDir, "app.ico"))))
 }
 Console.WriteLine($"Wrote icons to {outDir}");
 
+// Android launcher icons: legacy PNGs plus adaptive foreground/background layers per density.
+if (args.Length > 1)
+{
+    var res = args[1];
+    (string Dir, int Legacy, int Adaptive)[] densities = [("mdpi", 48, 108), ("hdpi", 72, 162), ("xhdpi", 96, 216), ("xxhdpi", 144, 324), ("xxxhdpi", 192, 432)];
+    foreach (var (dir, legacy, adaptive) in densities)
+    {
+        var folder = Path.Combine(res, "mipmap-" + dir);
+        Directory.CreateDirectory(folder);
+        SavePng(Path.Combine(folder, "appicon.png"), legacy, c => DiskLensIcon.Draw(c, legacy));
+        SavePng(Path.Combine(folder, "appicon_round.png"), legacy, c => { DiskLensIcon.Draw(c, legacy); });
+        // Adaptive foreground: the tile centred in the 66 % safe zone of the 108 dp canvas.
+        SavePng(Path.Combine(folder, "appicon_foreground.png"), adaptive, c =>
+        {
+            var inset = adaptive * 0.17f;
+            c.Translate(inset, inset);
+            DiskLensIcon.Draw(c, adaptive - 2 * inset);
+        });
+        SavePng(Path.Combine(folder, "appicon_background.png"), adaptive, c => c.Clear(new SKColor(0x17, 0x1A, 0x21)));
+    }
+    Console.WriteLine($"Wrote Android icons to {res}");
+}
+
+static void SavePng(string path, int size, Action<SKCanvas> draw)
+{
+    using var bmp = new SKBitmap(size, size, SKColorType.Rgba8888, SKAlphaType.Premul);
+    using (var canvas = new SKCanvas(bmp)) { canvas.Clear(SKColors.Transparent); draw(canvas); }
+    using var img = SKImage.FromBitmap(bmp);
+    using var data = img.Encode(SKEncodedImageFormat.Png, 100);
+    File.WriteAllBytes(path, data.ToArray());
+}
+
 static class DiskLensIcon
 {
     /// <summary>A dark rounded tile with a lens ring; inside, a small treemap in the app's accent colours.</summary>

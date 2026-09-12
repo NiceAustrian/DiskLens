@@ -31,12 +31,20 @@ public interface IFileSystemInspector
     ValueTask<VolumeInfo?> GetVolumeForPathAsync(string path, CancellationToken ct);
 }
 
-/// <summary>Process privilege information; scanners that read raw devices need it.</summary>
+/// <summary>How the UI should describe the extra privilege a platform can offer.</summary>
+public sealed record ElevationPrompt(string Title, string Message, string ButtonLabel);
+
+/// <summary>
+/// Extra privileges that widen what can be scanned: administrator on Windows (raw MFT access),
+/// "All files access" on Android, ... The UI shows <see cref="Prompt"/> until <see cref="IsElevated"/>.
+/// </summary>
 public interface IElevationService
 {
     bool IsElevated { get; }
     bool CanRelaunchElevated { get; }
-    /// <summary>Restarts the application with elevated privileges. Returns false if that failed or was declined.</summary>
+    /// <summary>Text for the banner offering elevation, or null if the platform has nothing to offer.</summary>
+    ElevationPrompt? Prompt { get; }
+    /// <summary>Restarts the application with elevated privileges (or opens the system dialog that grants them). Returns false if that failed or was declined.</summary>
     bool RelaunchElevated(string[] args);
 }
 
@@ -45,5 +53,6 @@ public sealed class NoElevationService : IElevationService
 {
     public bool IsElevated => false;
     public bool CanRelaunchElevated => false;
+    public ElevationPrompt? Prompt => null;
     public bool RelaunchElevated(string[] args) => false;
 }

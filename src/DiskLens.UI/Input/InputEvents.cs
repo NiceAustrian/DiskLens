@@ -24,6 +24,8 @@ public sealed class PointerEvent
     public Modifiers Modifiers { get; init; }
     public int ClickCount { get; init; } = 1;
     public SKPoint ScrollDelta { get; init; }                // lines; positive Y = scroll up
+    /// <summary>True for finger input: no hover, larger targets, drag scrolls, long-press opens menus.</summary>
+    public bool IsTouch { get; init; }
     public bool Handled { get; set; }
 }
 
