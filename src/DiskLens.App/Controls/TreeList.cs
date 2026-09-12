@@ -125,6 +125,7 @@ public sealed class TreeList : Element
         private readonly List<int> _flat = [];
         private readonly Dictionary<int, int> _rowOf = [];
         private readonly HashSet<int> _expanded = [];
+        private readonly SKPaint _paint = new() { IsAntialias = true };
 
         private ScanViewModel Vm => owner._vm;
         private FsTree Tree => owner._vm.Tree;
@@ -168,7 +169,7 @@ public sealed class TreeList : Element
             var isZoomRoot = node == Vm.ZoomRoot;
             var isVmHover = node == Vm.Hovered && !hovered;
 
-            using var paint = new SKPaint { IsAntialias = true };
+            var paint = _paint;
             if (selected)
             {
                 paint.Color = t.Selection;
@@ -191,7 +192,7 @@ public sealed class TreeList : Element
             x += 16;
 
             // Icon
-            var ext = tree.Extension(node);
+            var ext = tree.ExtensionSpan(node);
             var category = isDir ? FileCategory.Directory : FileColors.Categorize(ext);
             var iconColor = isDir ? (isZoomRoot ? t.Accent : t.TextSecondary) : FileColors.ColorOfExtension(ext);
             Icons.Draw(canvas, isDir ? (_expanded.Contains(node) ? Icon.FolderOpen : Icon.Folder) : Icon.File, x + 8, cy, 15, iconColor, 1.5f);

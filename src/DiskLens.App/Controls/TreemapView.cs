@@ -21,18 +21,27 @@ public sealed class TreemapView : Element
     private readonly List<Item> _items = [];
     private readonly Dictionary<int, int> _itemOf = [];
     private readonly Tween _zoomFade = new(1);
+    private readonly SKPaint _fill = new() { IsAntialias = false };
+    private readonly SKPaint _stroke = new() { IsAntialias = false, IsStroke = true, StrokeWidth = 1 };
+    private readonly SKPaint _ring = new() { IsAntialias = true, IsStroke = true };
+    private readonly SKPaint _glow = new() { IsAntialias = true, IsStroke = true, MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 3) };
     private SKPicture? _oldPicture;
-    private SKRect _oldBounds;
     private bool _dirty = true;
     private SKRect _layoutBounds;
     private int _hoverItem = -1;
+
+    // Uniform grid over the layout for O(1) hit-testing: each cell lists the items covering it.
+    private const int CellSize = 48;
+    private List<int>[] _grid = [];
+    private int _gridCols, _gridRows;
 
     private const float MinTile = 2.5f;      // px – smaller tiles are not laid out
     private const float DirHeader = 16f;     // label strip height inside directory frames
     private const float DirPad = 2f;
     private const int MaxItems = 80_000;
 
-    private readonly record struct Item(int Node, SKRect Rect, int Depth, bool IsDir, bool HasHeader);
+    /// <summary>One laid-out rectangle. Colour and label are resolved once here, not per frame.</summary>
+    private readonly record struct Item(int Node, SKRect Rect, int Depth, bool IsDir, bool HasHeader, SKColor Color, string? Label);
 
     public TreemapView(ScanViewModel vm)
     {
@@ -59,6 +68,28 @@ public sealed class TreemapView : Element
         var bounds = new LayoutRect(Bounds.Left, Bounds.Top, Bounds.Width, Bounds.Height);
         if (bounds.IsEmpty) return;
         LayoutChildren(root, bounds, 1);
+        BuildGrid();
+    }
+
+    private void BuildGrid()
+    {
+        _gridCols = Math.Max(1, (int)MathF.Ceiling(Bounds.Width / CellSize));
+        _gridRows = Math.Max(1, (int)MathF.Ceiling(Bounds.Height / CellSize));
+        var cells = _gridCols * _gridRows;
+        if (_grid.Length != cells) _grid = new List<int>[cells];
+        for (var i = 0; i < cells; i++) _grid[i]?.Clear();
+
+        for (var i = 0; i < _items.Count; i++)
+        {
+            var r = _items[i].Rect;
+            var c0 = Math.Clamp((int)((r.Left - Bounds.Left) / CellSize), 0, _gridCols - 1);
+            var c1 = Math.Clamp((int)((r.Right - Bounds.Left - 0.01f) / CellSize), 0, _gridCols - 1);
+            var r0 = Math.Clamp((int)((r.Top - Bounds.Top) / CellSize), 0, _gridRows - 1);
+            var r1 = Math.Clamp((int)((r.Bottom - Bounds.Top - 0.01f) / CellSize), 0, _gridRows - 1);
+            for (var row = r0; row <= r1; row++)
+                for (var col = c0; col <= c1; col++)
+                    (_grid[row * _gridCols + col] ??= []).Add(i);
+        }
     }
 
     private void LayoutChildren(int dir, LayoutRect rect, int depth)
@@ -90,8 +121,10 @@ public sealed class TreemapView : Element
             var node = kids[i];
             var isDir = tree.IsDirectory(node);
             var hasHeader = isDir && r.Width >= 48 && r.Height >= DirHeader + 12;
+            var color = isDir ? default : FileColors.ColorOfExtension(tree.ExtensionSpan(node));
+            var label = hasHeader || (!isDir && r.Width >= 56 && r.Height >= 30) ? tree.Name(node) : null;
             _itemOf[node] = _items.Count;
-            _items.Add(new Item(node, new SKRect(r.X, r.Y, r.Right, r.Bottom), depth, isDir, hasHeader));
+            _items.Add(new Item(node, new SKRect(r.X, r.Y, r.Right, r.Bottom), depth, isDir, hasHeader, color, label));
             if (isDir)
             {
                 var inner = new LayoutRect(
@@ -118,8 +151,9 @@ public sealed class TreemapView : Element
             return;
         }
 
-        using var paint = new SKPaint { IsAntialias = false };
-        using var stroke = new SKPaint { IsAntialias = false, IsStroke = true, StrokeWidth = 1 };
+        var paint = _fill;
+        var stroke = _stroke;
+        paint.Shader = null;
         var labelStyle = t.Caption.With(t.IsDark ? t.Text.WithAlpha(0xD0) : t.Text);
         var tree = _vm.Tree;
 
@@ -136,7 +170,7 @@ public sealed class TreemapView : Element
                 canvas.DrawRect(new SKRect(r.Left + 0.5f, r.Top + 0.5f, r.Right - 0.5f, r.Bottom - 0.5f), stroke);
                 if (item.HasHeader)
                 {
-                    var name = tree.Name(item.Node);
+                    var name = item.Label!;
                     var size = ByteSize.Format(tree.TotalSize(item.Node));
                     var avail = r.Width - 8;
                     var sizeW = labelStyle.Measure(size);
@@ -181,7 +215,7 @@ public sealed class TreemapView : Element
     private static void DrawTile(SKCanvas canvas, SKPaint paint, SKPaint stroke, in Item item, FsTree tree, Theme t)
     {
         var r = item.Rect;
-        var color = FileColors.ColorOfExtension(tree.Extension(item.Node));
+        var color = item.Color;
         if (r.Width < 6 || r.Height < 6)
         {
             paint.Shader = null;
@@ -209,9 +243,8 @@ public sealed class TreemapView : Element
         }
 
         // Label for big tiles
-        if (r.Width >= 56 && r.Height >= 30)
+        if (item.Label is { } name)
         {
-            var name = tree.Name(item.Node);
             var style = t.Caption.With(new SKColor(0, 0, 0, 0xB0));
             var style2 = t.Caption.With(SKColors.White.WithAlpha(0xF0));
             var cx = r.Left + 6;
@@ -228,10 +261,10 @@ public sealed class TreemapView : Element
     {
         if (node < 0 || !_itemOf.TryGetValue(node, out var idx)) return;
         var r = _items[idx].Rect;
-        using var ring = new SKPaint { IsAntialias = true, IsStroke = true, StrokeWidth = width, Color = color };
-        canvas.DrawRect(SKRect.Inflate(r, -width / 2, -width / 2), ring);
-        using var glow = new SKPaint { IsAntialias = true, IsStroke = true, StrokeWidth = width + 3, Color = color.WithAlpha(0x40), MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 3) };
-        canvas.DrawRect(r, glow);
+        _ring.StrokeWidth = width; _ring.Color = color;
+        canvas.DrawRect(SKRect.Inflate(r, -width / 2, -width / 2), _ring);
+        _glow.StrokeWidth = width + 3; _glow.Color = color.WithAlpha(0x40);
+        canvas.DrawRect(r, _glow);
     }
 
     private void BeginZoomTransition()
@@ -245,7 +278,6 @@ public sealed class TreemapView : Element
             OnDrawInternal(c);
             _oldPicture?.Dispose();
             _oldPicture = recorder.EndRecording();
-            _oldBounds = Bounds;
             _zoomFade.Jump(0);
             Animate(_zoomFade.To(1, 0.28f, Easing.OutCubic));
         }
@@ -265,11 +297,16 @@ public sealed class TreemapView : Element
     // Input --------------------------------------------------------------------------------------
     private int HitItem(SKPoint p)
     {
-        // Items are stored parent-before-children, so the last match is the deepest.
+        if (_grid.Length == 0 || !Bounds.Contains(p)) return -1;
+        var col = Math.Clamp((int)((p.X - Bounds.Left) / CellSize), 0, _gridCols - 1);
+        var row = Math.Clamp((int)((p.Y - Bounds.Top) / CellSize), 0, _gridRows - 1);
+        var cell = _grid[row * _gridCols + col];
+        if (cell is null) return -1;
+        // Items are stored parent-before-children, so the highest index is the deepest.
         var hit = -1;
-        for (var i = 0; i < _items.Count; i++)
+        foreach (var i in cell)
         {
-            if (_items[i].Rect.Contains(p)) hit = i;
+            if (i > hit && _items[i].Rect.Contains(p)) hit = i;
         }
         return hit;
     }

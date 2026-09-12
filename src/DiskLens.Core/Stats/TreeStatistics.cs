@@ -37,7 +37,8 @@ public static class TreeStatisticsBuilder
     {
         var nowTicks = (now ?? DateTime.UtcNow).Ticks;
         var count = tree.Count;
-        var byExt = new Dictionary<string, (long size, int files)>(StringComparer.Ordinal);
+        var byExt = new Dictionary<string, (long size, int files)>(StringComparer.OrdinalIgnoreCase);
+        var byExtSpan = byExt.GetAlternateLookup<ReadOnlySpan<char>>();
         var ageSize = new long[AgeRanges.Length];
         var ageCount = new int[AgeRanges.Length];
         var top = new PriorityQueue<int, long>(topFiles + 1);   // min-heap on size: smallest at the top
@@ -64,8 +65,13 @@ public static class TreeStatisticsBuilder
             var size = tree.Size(n);
             total += size;
 
-            var ext = tree.Extension(n);
-            byExt[ext] = byExt.TryGetValue(ext, out var acc) ? (acc.size + size, acc.files + 1) : (size, 1);
+            var ext = tree.ExtensionSpan(n);
+            string key;
+            if (ext.IsEmpty) key = "";
+            else if (!byExtSpan.TryGetValue(ext, out key!, out _)) key = ext.ToString().ToLowerInvariant();
+            ref var acc = ref System.Runtime.InteropServices.CollectionsMarshal.GetValueRefOrAddDefault(byExt, key, out _);
+            acc.size += size;
+            acc.files++;
 
             var age = nowTicks - tree.ModifiedTicks(n);
             for (var i = 0; i < AgeRanges.Length; i++)

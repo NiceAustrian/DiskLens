@@ -13,6 +13,7 @@ public class Button : Element
 {
     private readonly Tween _hover = new(0);
     private readonly Tween _press = new(0);
+    private readonly SKPaint _paint = new() { IsAntialias = true };
 
     public Button(string text = "", Icon icon = Icon.None)
     {
@@ -59,7 +60,8 @@ public class Button : Element
         var hover = _hover.Value;
         var press = _press.Value;
 
-        using var paint = new SKPaint { IsAntialias = true };
+        var paint = _paint;
+        paint.Shader = null; paint.IsStroke = false;
         switch (Style)
         {
             case ButtonStyle.Primary:

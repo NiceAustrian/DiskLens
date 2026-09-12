@@ -89,13 +89,20 @@ public sealed class FsTree
         return Path.Join(RootPath, Path.Join([.. parts]));
     }
 
-    /// <summary>File extension in lower-case without the dot, or "" for none / directories.</summary>
+    /// <summary>File extension in lower-case without the dot, or "" for none / directories. Allocates.</summary>
     public string Extension(int node)
     {
-        if (IsDirectory(node)) return "";
-        var name = NameCol[node];
+        var span = ExtensionSpan(node);
+        return span.IsEmpty ? "" : span.ToString().ToLowerInvariant();
+    }
+
+    /// <summary>File extension without the dot in its original case, or empty. No allocation.</summary>
+    public ReadOnlySpan<char> ExtensionSpan(int node)
+    {
+        if (IsDirectory(node)) return default;
+        var name = NameCol[node].AsSpan();
         var dot = name.LastIndexOf('.');
-        return dot <= 0 || dot == name.Length - 1 ? "" : name[(dot + 1)..].ToLowerInvariant();
+        return dot <= 0 || dot == name.Length - 1 ? default : name[(dot + 1)..];
     }
 
     // Mutation (builder only) ----------------------------------------------------------------

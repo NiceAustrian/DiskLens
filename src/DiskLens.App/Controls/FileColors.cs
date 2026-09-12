@@ -54,10 +54,17 @@ public static class FileColors
         ["db"] = FileCategory.Database, ["sqlite"] = FileCategory.Database, ["sqlite3"] = FileCategory.Database, ["mdf"] = FileCategory.Database,
         ["ldf"] = FileCategory.Database, ["accdb"] = FileCategory.Database, ["mdb"] = FileCategory.Database, ["parquet"] = FileCategory.Database,
         ["ibd"] = FileCategory.Database, ["frm"] = FileCategory.Database,
-    }.ToFrozenDictionary();
+    }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly FrozenDictionary<string, FileCategory>.AlternateLookup<ReadOnlySpan<char>> ByExtensionSpan =
+        ByExtension.GetAlternateLookup<ReadOnlySpan<char>>();
 
     public static FileCategory Categorize(string extension) =>
         ByExtension.TryGetValue(extension, out var c) ? c : FileCategory.Other;
+
+    /// <summary>Allocation-free variant for hot paths (treemap tiles, tree rows).</summary>
+    public static FileCategory Categorize(ReadOnlySpan<char> extension) =>
+        ByExtensionSpan.TryGetValue(extension, out var c) ? c : FileCategory.Other;
 
     public static SKColor ColorOf(FileCategory category) => category switch
     {
@@ -90,12 +97,14 @@ public static class FileColors
     };
 
     /// <summary>Deterministic per-extension tint for "Other" so unknown types are still distinguishable.</summary>
-    public static SKColor ColorOfExtension(string extension)
+    public static SKColor ColorOfExtension(string extension) => ColorOfExtension(extension.AsSpan());
+
+    public static SKColor ColorOfExtension(ReadOnlySpan<char> extension)
     {
         var cat = Categorize(extension);
         if (cat != FileCategory.Other || extension.Length == 0) return ColorOf(cat);
         var hash = 2166136261;
-        foreach (var ch in extension) hash = (hash ^ ch) * 16777619;
+        foreach (var ch in extension) hash = (hash ^ char.ToLowerInvariant(ch)) * 16777619;
         var hue = hash % 360;
         return SKColor.FromHsl(hue, 22, 62);
     }
