@@ -34,7 +34,7 @@ public interface IWindowChrome
 }
 
 /// <summary>Fallback for platforms where the native frame stays: nothing to do.</summary>
-public sealed class NativeChrome(Action minimize, Action toggleMaximize, Action close, Func<bool> isMaximized) : IWindowChrome
+public sealed class NativeChrome(Action minimize, Action toggleMaximize, Action close, Func<bool> isMaximized, Action<bool>? setDarkMode = null) : IWindowChrome
 {
     public bool IsCustomFrame => false;
     public bool IsMaximized => isMaximized();
@@ -45,7 +45,7 @@ public sealed class NativeChrome(Action minimize, Action toggleMaximize, Action 
     public void Minimize() => minimize();
     public void ToggleMaximize() => toggleMaximize();
     public void Close() => close();
-    public void SetDarkMode(bool dark) { }
+    public void SetDarkMode(bool dark) => setDarkMode?.Invoke(dark);
     public IDisposable AddMessageFilter(Func<nint, uint, nint, nint, nint?> filter) => new NoopDisposable();
 
     private sealed class NoopDisposable : IDisposable { public void Dispose() { } }

@@ -42,7 +42,7 @@ public sealed class DiskLensView : SKGLSurfaceView, IAppHost
         Focusable = true;
         FocusableInTouchMode = true;
 
-        Chrome = new NativeChrome(() => { }, () => { }, Close, () => false);
+        Chrome = new NativeChrome(() => { }, () => { }, Close, () => false, dark => _handler.Post(() => DarkModeChanged?.Invoke(dark)));
         _root.Clipboard = new AndroidClipboard(context);
         PaintSurface += OnPaintSurface;
     }
@@ -53,6 +53,9 @@ public sealed class DiskLensView : SKGLSurfaceView, IAppHost
     public nint NativeHandle => 0;
     public bool IsTouch => true;
     public event Action? Loaded;
+
+    /// <summary>Theme toggled from the UI; the activity restyles the system bars (UI thread).</summary>
+    public event Action<bool>? DarkModeChanged;
 
     /// <summary>Runs on the GL thread before the next frame (hides View.Post, which targets the UI thread).</summary>
     public new void Post(Action action)

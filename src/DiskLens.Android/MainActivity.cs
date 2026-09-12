@@ -49,6 +49,7 @@ public class MainActivity : Activity
         _shell = _services.GetRequiredService<AppShell>();
         _shell.Attach(_view);
         ApplySystemBarStyle(root.Theme.IsDark);
+        _view.DarkModeChanged += ApplySystemBarStyle;
         _hadAllFilesAccess = _services.GetRequiredService<IElevationService>().IsElevated;
     }
 
