@@ -5,4 +5,7 @@
   <ItemGroup>
     <ProjectReference Include="../DiskLens.Core/DiskLens.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DiskLens.Tests" />
+  </ItemGroup>
 </Project>

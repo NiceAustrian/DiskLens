@@ -14,5 +14,6 @@
   <ItemGroup>
     <ProjectReference Include="../../src/DiskLens.Core/DiskLens.Core.csproj" />
     <ProjectReference Include="../../src/DiskLens.Scanners.Generic/DiskLens.Scanners.Generic.csproj" />
+    <ProjectReference Include="../../src/DiskLens.Scanners.Windows/DiskLens.Scanners.Windows.csproj" />
   </ItemGroup>
 </Project>

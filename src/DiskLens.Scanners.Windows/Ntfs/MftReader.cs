@@ -305,7 +305,7 @@ internal sealed class MftReader
     }
 
     /// <summary>Undoes the NTFS update-sequence protection: restores the last two bytes of every sector.</summary>
-    private static bool ApplyFixups(Span<byte> rec)
+    internal static bool ApplyFixups(Span<byte> rec)
     {
         var usaOffset = BinaryPrimitives.ReadUInt16LittleEndian(rec[HdrUsaOffset..]);
         var usaCount = BinaryPrimitives.ReadUInt16LittleEndian(rec[HdrUsaCount..]);
@@ -342,7 +342,7 @@ internal sealed class MftReader
         throw new InvalidDataException("$MFT record has no non-resident $DATA attribute.");
     }
 
-    private static List<(long Lcn, long Clusters)> DecodeRuns(ReadOnlySpan<byte> runs)
+    internal static List<(long Lcn, long Clusters)> DecodeRuns(ReadOnlySpan<byte> runs)
     {
         var list = new List<(long, long)>();
         long lcn = 0;
