@@ -66,6 +66,19 @@ public sealed class FsTreeBuilder : IScanSink
         Interlocked.Add(ref _bytesSeen, size);
     }
 
+    private string? _phase;
+    private double? _phaseFraction;
+
+    /// <summary>Current scanner phase, if the scanner reports one.</summary>
+    public string? Phase => Volatile.Read(ref _phase);
+    public double? PhaseFraction => _phaseFraction;
+
+    public void ReportPhase(string phase, double? fraction = null)
+    {
+        _phaseFraction = fraction;
+        Volatile.Write(ref _phase, phase);
+    }
+
     public void ReportError(int directory, ScanError error)
     {
         var flag = error.Kind == ScanErrorKind.AccessDenied ? NodeFlags.AccessDenied : NodeFlags.Error;

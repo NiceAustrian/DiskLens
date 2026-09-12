@@ -44,9 +44,7 @@ public sealed class ChunkedArray<T>
             // Publish the new outer array before any reader can see a Count that needs it.
             Volatile.Write(ref _chunks, grown);
         }
-        for (var c = 0; c < chunksNeeded; c++)
-        {
-            _chunks[c] ??= new T[ChunkSize];
-        }
+        // Chunks are filled in order, so only the last one can be missing.
+        _chunks[chunksNeeded - 1] ??= new T[ChunkSize];
     }
 }

@@ -25,6 +25,9 @@ public interface IScanSink
 
     /// <summary>Marks a directory as (partially) unreadable and records the error.</summary>
     void ReportError(int directory, ScanError error);
+
+    /// <summary>Optional human-readable phase for scanners with distinct stages ("Reading MFT…").</summary>
+    void ReportPhase(string phase, double? fraction = null);
 }
 
 public enum ScanErrorKind { AccessDenied, NotFound, IoError, TooLong, Other }

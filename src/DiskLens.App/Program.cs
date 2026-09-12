@@ -35,6 +35,28 @@ builder.Services.AddSingleton<AppShell>();
 
 using var host = builder.Build();
 
+// Headless benchmark: DiskLens --bench <path> [--scanner <id>]
+if (args.Contains("--bench"))
+{
+    var path = args.FirstOrDefault(a => !a.StartsWith('-') && Directory.Exists(a)) ?? Directory.GetCurrentDirectory();
+    var scannerIdx = Array.IndexOf(args, "--scanner");
+    var scannerId = scannerIdx >= 0 && scannerIdx + 1 < args.Length ? args[scannerIdx + 1] : null;
+    var scans = host.Services.GetRequiredService<DiskLens.Core.Scanning.IScanService>();
+    var volumes = host.Services.GetRequiredService<DiskLens.Core.Platform.IVolumeService>();
+    var volume = await volumes.GetVolumeForPathAsync(path, CancellationToken.None);
+    var session = await scans.StartAsync(new DiskLens.Core.Scanning.ScanTarget(path, volume), preferredScannerId: scannerId);
+    while (!session.IsFinished)
+    {
+        await Task.Delay(500);
+        Console.WriteLine($"  {session.Phase ?? ""} {session.NodesAdded:N0} nodes, {DiskLens.Core.ByteSize.Format(session.BytesSeen)}");
+    }
+    var tree = session.Tree;
+    Console.WriteLine($"{session.State}: {session.Scanner.Id} · {tree.FileCount(0):N0} files · {tree.DirCount(0):N0} dirs · {DiskLens.Core.ByteSize.Format(tree.TotalSize(0))} · {session.Elapsed.TotalSeconds:0.00}s · {session.Errors.Count} errors");
+    if (session.Error is not null) Console.WriteLine(session.Error);
+    Console.WriteLine($"Working set: {Environment.WorkingSet / 1024 / 1024} MB");
+    return;
+}
+
 var window = host.Services.GetRequiredService<AppWindow>();
 var shell = host.Services.GetRequiredService<AppShell>();
 shell.Attach(window, args.FirstOrDefault(a => !a.StartsWith('-')));

@@ -11,6 +11,7 @@ public static class WindowsScannerServices
     public static IServiceCollection AddWindowsScanners(this IServiceCollection services)
     {
         services.Replace(ServiceDescriptor.Singleton<IElevationService, WindowsElevationService>());
+        if (OperatingSystem.IsWindows()) services.AddScanner<Ntfs.MftScanner>();
         return services;
     }
 }

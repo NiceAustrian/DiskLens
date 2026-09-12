@@ -39,6 +39,8 @@ public sealed class ScanSession : IDisposable
     public long NodesAdded => Builder.NodesAdded;
     public long BytesSeen => Builder.BytesSeen;
     public IReadOnlyList<ScanError> Errors => Builder.Errors;
+    public string? Phase => Builder.Phase;
+    public double? PhaseFraction => Builder.PhaseFraction;
 
     /// <summary>Completes when the scan finishes for whatever reason. Never faults.</summary>
     public Task Completion { get; private set; } = Task.CompletedTask;
