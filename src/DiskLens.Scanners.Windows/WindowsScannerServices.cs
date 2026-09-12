@@ -10,9 +10,10 @@ public static class WindowsScannerServices
     /// <summary>Windows-native pieces: volume enumeration, elevation and (later) the NTFS MFT scanner.</summary>
     public static IServiceCollection AddWindowsScanners(this IServiceCollection services)
     {
+        if (!OperatingSystem.IsWindows()) return services;
         services.Replace(ServiceDescriptor.Singleton<IElevationService, WindowsElevationService>());
         services.Replace(ServiceDescriptor.Singleton<IFileOperations, WindowsFileOperations>());
-        if (OperatingSystem.IsWindows()) services.AddScanner<Ntfs.MftScanner>();
+        services.AddScanner<Ntfs.MftScanner>();
         return services;
     }
 }

@@ -42,6 +42,7 @@ jobs:
         run: |
           name=DiskLens-${{ steps.v.outputs.version }}-${{ matrix.rid }}
           mkdir -p dist
+          rm -f out/${{ matrix.rid }}/*.pdb
           cp LICENSE README.md out/${{ matrix.rid }}/
           if [[ "${{ matrix.rid }}" == win-* ]]; then
             (cd out/${{ matrix.rid }} && 7z a -tzip "../../dist/$name.zip" . > /dev/null)
