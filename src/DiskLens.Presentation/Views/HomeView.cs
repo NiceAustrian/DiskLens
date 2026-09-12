@@ -51,12 +51,15 @@ public sealed class HomeView : Element
     {
         var card = new Box { Padding = new Thickness(16, 12), CornerRadius = 12 };
         card.Background = null;
-        var row = card.Add(new Row { Gap = 14 });
-        row.Add(new IconGlyph(Icon.Shield) { FixedWidth = 22, FixedHeight = 22 });
-        var text = row.Add(new Column { Gap = 2, Flex = 1, CrossAlign = CrossAlign.Start });
+        // Phones: icon + text on top, button below; desktops: one row.
+        Flex layout = _shell.IsTouch ? new Column { Gap = 12, CrossAlign = CrossAlign.Stretch } : new Row { Gap = 14 };
+        card.Add(layout);
+        var head = _shell.IsTouch ? layout.Add(new Row { Gap = 14 }) : layout;
+        head.Add(new IconGlyph(Icon.Shield) { FixedWidth = 22, FixedHeight = 22 });
+        var text = head.Add(new Column { Gap = 2, Flex = 1, CrossAlign = CrossAlign.Start });
         text.Add(new Label(prompt.Title) { StyleSelector = t => t.BodyMedium });
         text.Add(new WrappedLabel(prompt.Message) { StyleSelector = t => t.Small });
-        var btn = row.Add(new Button(prompt.ButtonLabel, Icon.Shield) { Style = ButtonStyle.Primary });
+        var btn = layout.Add(new Button(prompt.ButtonLabel, Icon.Shield) { Style = ButtonStyle.Primary });
         btn.Activated += () =>
         {
             if (_shell.Elevation.RelaunchElevated([])) _shell.Exit();

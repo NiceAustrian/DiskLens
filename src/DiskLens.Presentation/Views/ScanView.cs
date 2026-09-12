@@ -30,39 +30,44 @@ public sealed class ScanView : Element
     private readonly Button _rescan = new("Rescan", Icon.Refresh) { IsVisible = false };
     private readonly Button _open = new("Open", Icon.ExternalLink) { Style = ButtonStyle.Ghost, Tooltip = "Open in file manager" };
     private readonly Stopwatch _sinceRefresh = Stopwatch.StartNew();
+    private readonly IconButton _details = new(Icon.Info, "Details") { IsVisible = false };
+    private readonly Column _root;
+    private readonly TreeList _tree;
+    private readonly TreemapView _treemap;
+    private Element? _panes;
+    private bool _compact;
+
+    /// <summary>Below this logical width the panes stack vertically and details move into a sheet.</summary>
+    private const float CompactWidth = 700;
 
     public ScanView(AppShell shell, ScanSession session)
     {
         _shell = shell;
         _vm = new ScanViewModel(session);
         _crumbs = new Breadcrumb(_vm) { Flex = 1 };
+        _tree = new TreeList(_vm, shell.IsTouch);
+        _treemap = new TreemapView(_vm);
 
-        var root = Add(new Column());
+        _root = Add(new Column());
 
         // Toolbar ----------------------------------------------------------------------------------
-        var bar = root.Add(new Row { Gap = 10, Padding = new Thickness(14, 8), FixedHeight = 46 });
+        var bar = _root.Add(new Row { Gap = 10, Padding = new Thickness(14, 8), FixedHeight = 46 });
         bar.Add(_crumbs);
         bar.Add(_status);
         bar.Add(_progress);
         bar.Add(_stop);
         bar.Add(_rescan);
         bar.Add(_open);
+        bar.Add(_details);
         _open.IsVisible = shell.Files.CanReveal;
         _stop.Activated += session.Cancel;
         _rescan.Activated += () => shell.StartScan(session.Target);
         _open.Activated += OpenSelected;
+        _details.Activated += ShowDetailsSheet;
 
-        // Panes ------------------------------------------------------------------------------------
-        var panes = root.Add(new Row { Flex = 1, CrossAlign = CrossAlign.Stretch });
-        var left = panes.Add(new Box { Flex = 1, MinWidth = 420 });
-        left.Add(new TreeList(_vm));
-        panes.Add(new Divider { Axis = Axis.Vertical });
-
-        var right = panes.Add(new Column { Flex = 1.15f });
-        right.Add(new TreemapView(_vm) { Flex = 1.6f, Margin = new Thickness(0) });
-        right.Add(new Divider());
-        var details = right.Add(new Box { Flex = 1, MinHeight = 200 });
-        details.Add(new DetailsPanel(_vm, shell.Post));
+        // Panes: chosen by width, re-chosen on resize/rotation ----------------------------------------
+        ApplyLayout(shell.Root.Size.Width);
+        shell.Root.Resized += size => ApplyLayout(size.Width);
 
         _progress.IsIndeterminate = session.IsRunning;
         _vm.ContextMenuRequested += ShowContextMenu;
@@ -218,6 +223,58 @@ public sealed class ScanView : Element
     {
         for (var n = node; n != FsTree.None; n = _vm.Tree.Parent(n)) if (n == ancestor) return true;
         return false;
+    }
+
+    private void ApplyLayout(float width)
+    {
+        var compact = width > 0 && width < CompactWidth;
+        if (_panes is not null && compact == _compact) return;
+        _compact = compact;
+        if (_panes is not null) _root.Remove(_panes);
+
+        // Detach the reusable views from whatever held them before.
+        _tree.Parent?.Remove(_tree);
+        _treemap.Parent?.Remove(_treemap);
+
+        if (compact)
+        {
+            var column = new Column { Flex = 1 };
+            _treemap.Flex = 1;
+            column.Add(_treemap);
+            column.Add(new Divider());
+            _tree.Flex = 1.3f;
+            column.Add(_tree);
+            _panes = column;
+            _details.IsVisible = true;
+            _status.IsVisible = false;   // no room; the sheet shows the numbers
+        }
+        else
+        {
+            var panes = new Row { Flex = 1, CrossAlign = CrossAlign.Stretch };
+            var left = panes.Add(new Box { Flex = 1, MinWidth = 420 });
+            _tree.Flex = 0;
+            left.Add(_tree);
+            panes.Add(new Divider { Axis = Axis.Vertical });
+            var right = panes.Add(new Column { Flex = 1.15f });
+            _treemap.Flex = 1.6f;
+            right.Add(_treemap);
+            right.Add(new Divider());
+            var details = right.Add(new Box { Flex = 1, MinHeight = 200 });
+            details.Add(new DetailsPanel(_vm, _shell.Post));
+            _panes = panes;
+            _details.IsVisible = false;
+            _status.IsVisible = true;
+        }
+        _root.Add(_panes);
+    }
+
+    private void ShowDetailsSheet()
+    {
+        if (Root is not { } root) return;
+        var sheet = new BottomSheet(0.62f);
+        var panel = new DetailsPanel(_vm, _shell.Post);
+        sheet.Content.Add(panel);
+        sheet.Show(root);
     }
 
     private void UpdateStatus()

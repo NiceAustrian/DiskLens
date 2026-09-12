@@ -23,16 +23,20 @@ public sealed class TreeList : Element
 
     // Column widths (right-aligned block); the name column takes the rest.
     private const float ColSize = 92, ColBar = 96, ColItems = 72, ColDate = 92;
-    private const float RowH = 26;
+
+    /// <summary>Narrow lists (phones) drop the items and date columns so names keep their room.</summary>
+    private bool Narrow => Bounds.Width < 560;
+    private readonly float RowH;
     private const float Indent = 16;
 
-    public TreeList(ScanViewModel vm)
+    public TreeList(ScanViewModel vm, bool touch = false)
     {
         _vm = vm;
         CanFocus = true;
+        RowH = touch ? 42 : 26;   // finger-sized rows on phones
 
         var column = Add(new Column());
-        _header = column.Add(new Header(this) { FixedHeight = 28 });
+        _header = column.Add(new Header(this) { FixedHeight = touch ? 34 : 28 });
         _scroll = column.Add(new ScrollView { Flex = 1 });
         _rows = _scroll.Add(new Rows(this) { RowHeight = RowH });
 
@@ -111,11 +115,13 @@ public sealed class TreeList : Element
             var y = Bounds.MidY;
             var right = Bounds.Right - 12;
             TextRender.Draw(canvas, "Name", Bounds.Left + 12, y, style);
-            TextRender.Draw(canvas, "Modified", right, y, style, TextAlign.Right); right -= ColDate;
-            TextRender.Draw(canvas, "Items", right, y, style, TextAlign.Right); right -= ColItems;
+            if (!owner.Narrow)
+            {
+                TextRender.Draw(canvas, "Modified", right, y, style, TextAlign.Right); right -= ColDate;
+                TextRender.Draw(canvas, "Items", right, y, style, TextAlign.Right); right -= ColItems;
+            }
             TextRender.Draw(canvas, "Share", right, y, style, TextAlign.Right); right -= ColBar;
             TextRender.Draw(canvas, "Size", right, y, style, TextAlign.Right);
-            _ = owner;
         }
     }
 
@@ -203,13 +209,16 @@ public sealed class TreeList : Element
             var right = rect.Right - 12;
             var mono = t.MonoSecondary;
 
-            if (tree.ModifiedTicks(node) > 0)
-                TextRender.Draw(canvas, tree.Modified(node).ToLocalTime().ToString("yyyy-MM-dd"), right, cy, t.MonoSmall, TextAlign.Right);
-            right -= ColDate;
+            if (!owner.Narrow)
+            {
+                if (tree.ModifiedTicks(node) > 0)
+                    TextRender.Draw(canvas, tree.Modified(node).ToLocalTime().ToString("yyyy-MM-dd"), right, cy, t.MonoSmall, TextAlign.Right);
+                right -= ColDate;
 
-            var items = isDir ? tree.FileCount(node) + tree.DirCount(node) : 0;
-            if (isDir) TextRender.Draw(canvas, items.ToString("N0"), right, cy, t.MonoSmall, TextAlign.Right);
-            right -= ColItems;
+                var items = isDir ? tree.FileCount(node) + tree.DirCount(node) : 0;
+                if (isDir) TextRender.Draw(canvas, items.ToString("N0"), right, cy, t.MonoSmall, TextAlign.Right);
+                right -= ColItems;
+            }
 
             // Share bar relative to the parent
             var parent = tree.Parent(node);

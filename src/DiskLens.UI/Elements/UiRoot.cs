@@ -83,7 +83,11 @@ public sealed class UiRoot : Element
         Size = size;
         Scale = scale;
         RequestLayout();
+        Resized?.Invoke(size);
     }
+
+    /// <summary>Raised when the host window changes size (after the new size is set).</summary>
+    public event Action<SKSize>? Resized;
 
     public void RequestLayout() { _needsLayout = true; _needsRedraw = true; }
     public void RequestRedraw() => _needsRedraw = true;

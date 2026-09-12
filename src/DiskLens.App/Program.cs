@@ -31,7 +31,11 @@ static class Program
         else
             builder.Services.AddPosixScanners();
 
-        builder.Services.AddSingleton(new WindowConfig("DiskLens", 1360, 860) { IconPng = DiskLens.Presentation.PresentationAssets.IconPng });
+        // --window WxH: initial size (handy for checking the phone layout on a desktop)
+        var winArg = args.SkipWhile(a => a != "--window").Skip(1).FirstOrDefault()?.Split('x');
+        var winW = winArg?.Length == 2 && int.TryParse(winArg[0], out var pw) ? pw : 1360;
+        var winH = winArg?.Length == 2 && int.TryParse(winArg[1], out var ph) ? ph : 860;
+        builder.Services.AddSingleton(new WindowConfig("DiskLens", winW, winH) { IconPng = DiskLens.Presentation.PresentationAssets.IconPng });
         builder.Services.AddSingleton(sp => new UiRoot(args.Contains("--light") ? Theme.Light : Theme.Dark));
         builder.Services.AddSingleton(sp => new AppWindow(
             sp.GetRequiredService<WindowConfig>(),
@@ -79,7 +83,14 @@ static class Program
 
         var window = host.Services.GetRequiredService<AppWindow>();
         var shell = host.Services.GetRequiredService<AppShell>();
-        shell.Attach(window, args.FirstOrDefault(a => !a.StartsWith('-')));
+        // First positional argument = path to scan; option values (--window WxH, --scanner id) are skipped.
+        string? initialPath = null;
+        for (var i = 0; i < args.Length; i++)
+        {
+            if (args[i] is "--window" or "--scanner") { i++; continue; }
+            if (!args[i].StartsWith('-')) { initialPath = args[i]; break; }
+        }
+        shell.Attach(window, initialPath);
         window.Run();
         return 0;
     }

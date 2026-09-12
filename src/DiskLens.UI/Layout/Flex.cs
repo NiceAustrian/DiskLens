@@ -26,20 +26,37 @@ public class Flex : Element
     protected override SKSize MeasureContent(SKSize available)
     {
         var inner = new SKSize(Math.Max(0, available.Width - Padding.Horizontal), Math.Max(0, available.Height - Padding.Vertical));
-        float main = 0, cross = 0;
+        float main = 0, cross = 0, totalFlex = 0;
         var visible = 0;
+
+        // Pass 1: fixed children at full availability.
         foreach (var c in Children)
         {
             if (!c.IsVisible) continue;
-            var s = c.Measure(inner);
             visible++;
+            if (c.Flex > 0) { totalFlex += c.Flex; continue; }
+            var s = c.Measure(inner);
             if (Horizontal) { main += s.Width; cross = Math.Max(cross, s.Height); }
             else            { main += s.Height; cross = Math.Max(cross, s.Width); }
         }
         if (visible > 1) main += Gap * (visible - 1);
-        // Flex children want to fill: report the full available main size if any child flexes.
-        var anyFlex = Children.Any(c => c.IsVisible && c.Flex > 0);
-        if (anyFlex) main = Math.Max(main, Horizontal ? inner.Width : inner.Height);
+
+        // Pass 2: flex children at the share they will actually get, so wrapping text inside them
+        // reports the cross size it needs at that width.
+        var anyFlex = totalFlex > 0;
+        if (anyFlex)
+        {
+            var mainAvail = Horizontal ? inner.Width : inner.Height;
+            var remaining = Math.Max(0, mainAvail - main);
+            foreach (var c in Children)
+            {
+                if (!c.IsVisible || c.Flex <= 0) continue;
+                var share = float.IsInfinity(remaining) ? remaining : remaining * c.Flex / totalFlex;
+                var s = c.Measure(Horizontal ? new SKSize(share, inner.Height) : new SKSize(inner.Width, share));
+                cross = Math.Max(cross, Horizontal ? s.Height : s.Width);
+            }
+            main = Math.Max(main, mainAvail);
+        }
         return Horizontal
             ? new SKSize(main + Padding.Horizontal, cross + Padding.Vertical)
             : new SKSize(cross + Padding.Horizontal, main + Padding.Vertical);
