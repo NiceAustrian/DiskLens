@@ -27,6 +27,7 @@ public sealed class AppShell
     private readonly Row _bar = new() { Gap = 10, Padding = new Thickness(12, 0, 0, 0), FixedHeight = TitleBarHeight };
     private Element? _current;
     private AppWindow? _window;
+    private ScanSession? _session;
     private CaptionButtons? _captionButtons;
 
     private const float TitleBarHeight = 54;
@@ -133,18 +134,24 @@ public sealed class AppShell
 
     public void ShowHome()
     {
+        EndCurrentScan();
         _back.IsVisible = false;
         SetTitle("DiskLens", "Pick a drive or folder to analyse");
         Navigate(new HomeView(this));
     }
 
-    public async void StartScan(ScanTarget target)
+    /// <summary>Starts a scan and shows it. Fire-and-forget safe: failures are logged and shown, never thrown.</summary>
+    public void StartScan(ScanTarget target) => _ = StartScanAsync(target);
+
+    private async Task StartScanAsync(ScanTarget target)
     {
         try
         {
+            EndCurrentScan();
             var session = await Scans.StartAsync(target);
             Post(() =>
             {
+                _session = session;
                 _back.IsVisible = true;
                 SetTitle(target.DisplayName, target.Path);
                 Navigate(new ScanView(this, session));
@@ -155,6 +162,16 @@ public sealed class AppShell
             LoggerFactory.CreateLogger<AppShell>().LogError(ex, "Could not start scan of {Path}", target.Path);
             Post(() => SetTitle("DiskLens", $"Could not scan {target.Path}: {ex.Message}"));
         }
+    }
+
+    /// <summary>A scan nobody is looking at any more should not keep hammering the disk.</summary>
+    private void EndCurrentScan()
+    {
+        var old = _session;
+        _session = null;
+        if (old is null) return;
+        old.Cancel();
+        _ = old.Completion.ContinueWith(_ => old.Dispose());
     }
 
     public void SetTitle(string title, string subtitle)
