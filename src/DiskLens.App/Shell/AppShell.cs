@@ -53,12 +53,18 @@ public sealed class AppShell
     /// <summary>Runs <paramref name="action"/> on the UI thread.</summary>
     public void Post(Action action) => _window?.Post(action);
 
-    public void Attach(AppWindow window)
+    public void Attach(AppWindow window, string? initialPath = null)
     {
         _window = window;
         Root.SetContent(BuildFrame());
         Root.KeyDown += OnGlobalKey;
         ShowHome();
+        if (initialPath is not null && Directory.Exists(initialPath))
+        {
+            var path = Path.GetFullPath(initialPath);
+            _ = Volumes.GetVolumeForPathAsync(path, CancellationToken.None).AsTask()
+                .ContinueWith(t => Post(() => StartScan(new ScanTarget(path, t.IsCompletedSuccessfully ? t.Result : null))));
+        }
     }
 
     private Element BuildFrame()

@@ -13,6 +13,7 @@ namespace DiskLens.UI.Elements;
 public abstract class Element
 {
     private readonly List<Element> _children = [];
+    private List<IAnimation>? _pendingAnimations;
     private bool _isVisible = true;
 
     public Element? Parent { get; private set; }
@@ -61,6 +62,7 @@ public abstract class Element
         if (child.Parent is not null) child.Parent.Remove(child);
         child.Parent = this;
         _children.Add(child);
+        if (Root is { } root) child.OnAttached(root);
         InvalidateLayout();
         return child;
     }
@@ -70,7 +72,20 @@ public abstract class Element
         if (child.Parent is not null) child.Parent.Remove(child);
         child.Parent = this;
         _children.Insert(index, child);
+        if (Root is { } root) child.OnAttached(root);
         InvalidateLayout();
+    }
+
+    /// <summary>Called once the element (and its subtree) is reachable from a root. Flushes queued animations.</summary>
+    private void OnAttached(UiRoot root)
+    {
+        if (_pendingAnimations is { } pending)
+        {
+            _pendingAnimations = null;
+            foreach (var a in pending) root.Animator.Run(a);
+            root.RequestRedraw();
+        }
+        foreach (var c in _children) c.OnAttached(root);
     }
 
     public void Remove(Element child)
@@ -105,8 +120,12 @@ public abstract class Element
     public void Invalidate() => Root?.RequestRedraw();
     public void InvalidateLayout() => Root?.RequestLayout();
 
-    /// <summary>Runs an animation and keeps redrawing until it finishes.</summary>
-    public void Animate(IAnimation animation) => Root?.Animator.Run(animation);
+    /// <summary>Runs an animation and keeps redrawing until it finishes. Queued if not yet attached to a root.</summary>
+    public void Animate(IAnimation animation)
+    {
+        if (Root is { } root) root.Animator.Run(animation);
+        else (_pendingAnimations ??= []).Add(animation);
+    }
 
     // Layout -------------------------------------------------------------------------------------
     /// <summary>Returns the desired size within <paramref name="available"/>, honouring fixed/min/max hints.</summary>

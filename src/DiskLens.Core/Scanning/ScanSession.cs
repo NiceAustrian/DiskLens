@@ -103,10 +103,7 @@ public sealed class ScanService(IScannerRegistry registry, ILogger<ScanService> 
     public async Task<ScanSession> StartAsync(ScanTarget target, ScanOptions? options = null, string? preferredScannerId = null, CancellationToken ct = default)
     {
         var selection = await registry.SelectAsync(target, preferredScannerId, ct).ConfigureAwait(false);
-        var rootName = target.Volume?.DisplayName ?? Path.GetFileName(Path.TrimEndingDirectorySeparator(target.Path));
-        if (string.IsNullOrEmpty(rootName)) rootName = target.Path;
-
-        var builder = new FsTreeBuilder(target.Path, rootName);
+        var builder = new FsTreeBuilder(target.Path, target.DisplayName);
         var session = new ScanSession(target, selection, options ?? ScanOptions.Default, builder);
         session.Start(logger);
         return session;

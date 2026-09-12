@@ -37,5 +37,5 @@ using var host = builder.Build();
 
 var window = host.Services.GetRequiredService<AppWindow>();
 var shell = host.Services.GetRequiredService<AppShell>();
-shell.Attach(window);
+shell.Attach(window, args.FirstOrDefault(a => !a.StartsWith('-')));
 window.Run();

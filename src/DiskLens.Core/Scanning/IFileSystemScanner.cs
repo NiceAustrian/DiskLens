@@ -5,9 +5,16 @@ namespace DiskLens.Core.Scanning;
 /// <summary>What to scan: a path, and – if known – the volume it lives on.</summary>
 public sealed record ScanTarget(string Path, VolumeInfo? Volume = null)
 {
-    public string DisplayName => Volume is { } v && string.Equals(v.MountPath, Path, StringComparison.OrdinalIgnoreCase)
-        ? v.DisplayName
-        : Path;
+    /// <summary>Volume label for a whole volume, otherwise the folder name.</summary>
+    public string DisplayName
+    {
+        get
+        {
+            if (Volume is { } v && string.Equals(v.MountPath, Path, StringComparison.OrdinalIgnoreCase)) return v.DisplayName;
+            var name = System.IO.Path.GetFileName(System.IO.Path.TrimEndingDirectorySeparator(Path));
+            return string.IsNullOrEmpty(name) ? Path : name;
+        }
+    }
 }
 
 public sealed record ScanOptions
