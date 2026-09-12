@@ -240,6 +240,14 @@ public sealed class TreeList : Element
         protected override void OnRowClick(int index, PointerEvent e)
         {
             var node = _flat[index];
+            if (e.Button == PointerButton.Right)
+            {
+                SelectedRow = index;
+                Vm.Selected = node;
+                Vm.RequestContextMenu(node, e.Position);
+                e.Handled = true;
+                return;
+            }
             var depth = Tree.Depth(node);
             var chevronX = Bounds.Left + 12 + depth * Indent;
             if (e.Button == PointerButton.Left && Tree.IsDirectory(node) && e.Position.X >= chevronX - 2 && e.Position.X < chevronX + 16)

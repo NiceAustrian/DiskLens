@@ -148,6 +148,27 @@ public sealed class FsTree
 
     internal void AddFlags(int node, NodeFlags flags) => FlagsCol[node] |= flags;
 
+    /// <summary>Removes <paramref name="node"/> from its parent's child list. The node keeps its data but is unreachable.</summary>
+    internal void Unlink(int node)
+    {
+        var parent = ParentCol[node];
+        if (parent == None) return;
+        var first = FirstChildCol[parent];
+        if (first == node)
+        {
+            Volatile.Write(ref FirstChildCol[parent], NextSiblingCol[node]);
+            return;
+        }
+        for (var n = first; n != None; n = NextSiblingCol[n])
+        {
+            if (NextSiblingCol[n] == node)
+            {
+                NextSiblingCol[n] = NextSiblingCol[node];
+                return;
+            }
+        }
+    }
+
     public struct ChildEnumerator
     {
         private readonly FsTree _tree;

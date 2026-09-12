@@ -63,8 +63,88 @@ public sealed class ScanView : Element
         details.Add(new DetailsPanel(_vm, shell.Post));
 
         _progress.IsIndeterminate = session.IsRunning;
+        _vm.ContextMenuRequested += ShowContextMenu;
         Animate(new ScanPoller(this));
         UpdateStatus();
+    }
+
+    private void ShowContextMenu(int node, SKPoint at)
+    {
+        var tree = _vm.Tree;
+        var isDir = tree.IsDirectory(node);
+        var isRoot = node == FsTree.Root;
+        var finished = _vm.Session.IsFinished;
+        var items = new List<MenuItem>
+        {
+            new(OperatingSystem.IsWindows() ? "Open in Explorer" : "Reveal in file manager", Icon.ExternalLink, () => Reveal(node)),
+            new("Copy path", Icon.Copy, () => Root?.Clipboard?.SetText(tree.FullPath(node)), Shortcut: "Ctrl+C"),
+        };
+        if (isDir)
+        {
+            items.Add(new("Zoom treemap here", Icon.Search, () => _vm.ZoomRoot = node, IsEnabled: node != _vm.ZoomRoot));
+        }
+        if (_vm.ZoomRoot != FsTree.Root)
+        {
+            items.Add(new("Zoom out", Icon.ArrowUp, _vm.ZoomOut, Shortcut: "Backspace"));
+        }
+        items.Add(MenuItem.Separator);
+        var deleteLabel = _shell.Files.SupportsRecycleBin ? "Move to Recycle Bin" : "Delete permanently";
+        items.Add(new(deleteLabel, Icon.Trash, () => ConfirmDelete(node), IsDanger: true, IsEnabled: finished && !isRoot, Shortcut: "Del"));
+
+        if (Root is { } root) ContextMenu.Show(root, at, [.. items]);
+    }
+
+    private void Reveal(int node)
+    {
+        try { _shell.Files.RevealInFileManager(_vm.Tree.FullPath(node), _vm.Tree.IsDirectory(node)); }
+        catch (Exception ex) { _status.Text = "Could not open: " + ex.Message; }
+    }
+
+    private void ConfirmDelete(int node)
+    {
+        if (Root is not { } root || node == FsTree.Root || !_vm.Session.IsFinished) return;
+        var tree = _vm.Tree;
+        var name = tree.Name(node);
+        var size = ByteSize.Format(tree.TotalSize(node));
+        var what = tree.IsDirectory(node) ? $"the folder \"{name}\" ({size}, {tree.FileCount(node):N0} files)" : $"\"{name}\" ({size})";
+        var (title, verb) = _shell.Files.SupportsRecycleBin
+            ? ("Move to Recycle Bin?", "Move to Recycle Bin")
+            : ("Delete permanently?", "Delete");
+        var message = _shell.Files.SupportsRecycleBin
+            ? $"{what} will be moved to the Recycle Bin. You can restore it from there."
+            : $"{what} will be deleted permanently. This cannot be undone.";
+        new ConfirmDialog(title, message, verb, () => _ = DeleteAsync(node), danger: true).Show(root);
+    }
+
+    private async Task DeleteAsync(int node)
+    {
+        var tree = _vm.Tree;
+        var path = tree.FullPath(node);
+        var isDir = tree.IsDirectory(node);
+        _status.Text = $"Deleting {tree.Name(node)}…";
+        try
+        {
+            await _shell.Files.DeleteAsync(path, isDir, CancellationToken.None);
+            _shell.Post(() =>
+            {
+                var parent = tree.Parent(node);
+                _vm.Session.Builder.RemoveSubtree(node);
+                if (_vm.ZoomRoot == node || IsUnder(_vm.ZoomRoot, node)) _vm.ZoomRoot = parent;
+                _vm.Selected = parent;
+                _vm.NotifyDataChanged();
+                UpdateStatus();
+            });
+        }
+        catch (Exception ex)
+        {
+            _shell.Post(() => _status.Text = "Delete failed: " + ex.Message);
+        }
+    }
+
+    private bool IsUnder(int node, int ancestor)
+    {
+        for (var n = node; n != FsTree.None; n = _vm.Tree.Parent(n)) if (n == ancestor) return true;
+        return false;
     }
 
     private void UpdateStatus()
@@ -72,8 +152,15 @@ public sealed class ScanView : Element
         var s = _vm.Session;
         var elapsed = s.Elapsed;
         var rate = elapsed.TotalSeconds > 0.5 ? s.NodesAdded / elapsed.TotalSeconds : 0;
+        if (s.State == ScanState.Running)
+        {
+            var fraction = s.PhaseFraction;
+            if (fraction is { } f) { _progress.IsIndeterminate = false; _progress.Value = (float)f; }
+            else if (!_progress.IsIndeterminate) _progress.IsIndeterminate = true;
+        }
         _status.Text = s.State switch
         {
+            ScanState.Running when s.Phase is { } phase && s.NodesAdded == 0 => phase,
             ScanState.Running => $"{s.NodesAdded:N0} items · {ByteSize.Format(s.BytesSeen)} · {rate:N0}/s",
             ScanState.Completed => $"{s.Tree.FileCount(FsTree.Root):N0} files · {s.Tree.DirCount(FsTree.Root):N0} folders · {ByteSize.Format(s.Tree.TotalSize(FsTree.Root))} · {elapsed.TotalSeconds:0.0}s · {s.Scanner.DisplayName}"
                                    + (s.Errors.Count > 0 ? $" · {s.Errors.Count} skipped" : ""),
@@ -94,30 +181,20 @@ public sealed class ScanView : Element
         InvalidateLayout();
     }
 
-    private void OpenSelected()
-    {
-        var tree = _vm.Tree;
-        var node = _vm.Selected;
-        var path = tree.FullPath(node);
-        try
-        {
-            if (OperatingSystem.IsWindows())
-                Process.Start(new ProcessStartInfo("explorer.exe", tree.IsDirectory(node) ? $"\"{path}\"" : $"/select,\"{path}\"") { UseShellExecute = true });
-            else if (OperatingSystem.IsMacOS())
-                Process.Start("open", tree.IsDirectory(node) ? [path] : ["-R", path]);
-            else
-                Process.Start("xdg-open", [tree.IsDirectory(node) ? path : Path.GetDirectoryName(path) ?? path]);
-        }
-        catch (Exception ex)
-        {
-            _status.Text = "Could not open: " + ex.Message;
-        }
-    }
+    private void OpenSelected() => Reveal(_vm.Selected);
 
     protected override void OnKeyDown(KeyEvent e)
     {
-        if (e.Key == Key.F5 && _vm.Session.IsFinished) { _shell.StartScan(_vm.Session.Target); e.Handled = true; return; }
-        base.OnKeyDown(e);
+        var ctrl = (e.Modifiers & Modifiers.Control) != 0;
+        switch (e.Key)
+        {
+            case Key.F5 when _vm.Session.IsFinished: _shell.StartScan(_vm.Session.Target); break;
+            case Key.C when ctrl: Root?.Clipboard?.SetText(_vm.Tree.FullPath(_vm.Selected)); break;
+            case Key.Delete: ConfirmDelete(_vm.Selected); break;
+            case Key.Backspace: _vm.ZoomOut(); break;
+            default: base.OnKeyDown(e); return;
+        }
+        e.Handled = true;
     }
 
     /// <summary>Per-frame poll while the scan runs: status text every frame, data refresh every 400 ms.</summary>

@@ -66,6 +66,24 @@ public sealed class FsTreeBuilder : IScanSink
         Interlocked.Add(ref _bytesSeen, size);
     }
 
+    /// <summary>
+    /// Removes a node (and its subtree) from the tree after the user deleted it on disk: unlinks it and
+    /// subtracts its totals from every ancestor. Only valid once the scan has finished.
+    /// </summary>
+    public void RemoveSubtree(int node)
+    {
+        if (node == FsTree.Root) throw new InvalidOperationException("Cannot remove the root.");
+        lock (_gate)
+        {
+            if (Tree.HasFlag(node, NodeFlags.Deleted)) return;
+            Tree.AddFlags(node, NodeFlags.Deleted);
+            Tree.Unlink(node);
+        }
+        var parent = Tree.Parent(node);
+        var isDir = Tree.IsDirectory(node);
+        Tree.Propagate(parent, -Tree.TotalSize(node), -Tree.TotalAllocated(node), -Tree.FileCount(node), -(Tree.DirCount(node) + (isDir ? 1 : 0)), 0);
+    }
+
     private string? _phase;
     private double? _phaseFraction;
 

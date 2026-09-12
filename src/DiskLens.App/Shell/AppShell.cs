@@ -31,27 +31,33 @@ public sealed class AppShell
         IVolumeService volumes,
         IScanService scans,
         IElevationService elevation,
+        IFileOperations files,
         ILoggerFactory loggerFactory,
         UiRoot root)
     {
         Volumes = volumes;
         Scans = scans;
         Elevation = elevation;
+        Files = files;
         LoggerFactory = loggerFactory;
         Root = root;
 
         _back.Activated += () => ShowHome();
         _themeToggle.Activated += ToggleTheme;
+        _themeToggle.Icon = root.Theme.IsDark ? Icon.Sun : Icon.Moon;
     }
 
     public IVolumeService Volumes { get; }
     public IScanService Scans { get; }
     public IElevationService Elevation { get; }
+    public IFileOperations Files { get; }
     public ILoggerFactory LoggerFactory { get; }
     public UiRoot Root { get; }
 
     /// <summary>Runs <paramref name="action"/> on the UI thread.</summary>
     public void Post(Action action) => _window?.Post(action);
+
+    public void Exit() => _window?.Close();
 
     public void Attach(AppWindow window, string? initialPath = null)
     {

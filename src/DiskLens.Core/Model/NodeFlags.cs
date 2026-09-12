@@ -15,4 +15,5 @@ public enum NodeFlags : ushort
     Error         = 1 << 8,   // any other enumeration error
     Root          = 1 << 9,
     HardLink      = 1 << 10,  // file has more than one name on the volume
+    Deleted       = 1 << 11,  // removed after the scan (by the user); unlinked from its parent
 }

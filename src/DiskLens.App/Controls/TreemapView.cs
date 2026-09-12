@@ -13,7 +13,7 @@ namespace DiskLens.App.Controls;
 /// <summary>
 /// Nested squarified treemap. Directories are drawn as labelled frames, files as shaded tiles
 /// coloured by type. Hover highlights, click selects (and reveals in the tree), double-click zooms in,
-/// right-click / Backspace zooms out. Layout is recomputed lazily when data, size or zoom change.
+/// right-click opens the context menu, Backspace zooms out. Layout is recomputed lazily when data, size or zoom change.
 /// </summary>
 public sealed class TreemapView : Element
 {
@@ -144,7 +144,7 @@ public sealed class TreemapView : Element
                     if (nameW + sizeW + 10 <= avail)
                     {
                         TextRender.Draw(canvas, name, r.Left + 4, r.Top + DirHeader / 2, labelStyle);
-                        TextRender.Draw(canvas, size, r.Right - 4, r.Top + DirHeader / 2, labelStyle.With(t.TextMuted), TextAlign.Right);
+                        TextRender.Draw(canvas, size, r.Right - 4, r.Top + DirHeader / 2, labelStyle.With(t.TextSecondary), TextAlign.Right);
                     }
                     else
                     {
@@ -309,7 +309,9 @@ public sealed class TreemapView : Element
     {
         if (e.Button == PointerButton.Right)
         {
-            _vm.ZoomOut();
+            var target = _hoverItem >= 0 ? _items[_hoverItem].Node : _vm.ZoomRoot;
+            _vm.Selected = target;
+            _vm.RequestContextMenu(target, e.Position);
             e.Handled = true;
             return;
         }

@@ -102,7 +102,11 @@ public static class TreeStatisticsBuilder
     {
         var d = tree.Depth(node);
         if (d <= ancestorDepth) return false;
-        for (; d > ancestorDepth; d--) node = tree.Parent(node);
+        for (; d > ancestorDepth; d--)
+        {
+            if (tree.HasFlag(node, NodeFlags.Deleted)) return false;   // removed after the scan
+            node = tree.Parent(node);
+        }
         return node == ancestor;
     }
 

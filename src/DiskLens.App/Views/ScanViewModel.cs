@@ -65,6 +65,11 @@ public sealed class ScanViewModel
     /// <summary>Request that the tree list scrolls to and reveals a node (e.g. after a treemap click).</summary>
     public event Action<int>? RevealRequested;
 
+    /// <summary>Raised when a view wants the node's context menu at a window position.</summary>
+    public event Action<int, SkiaSharp.SKPoint>? ContextMenuRequested;
+
+    public void RequestContextMenu(int node, SkiaSharp.SKPoint at) => ContextMenuRequested?.Invoke(node, at);
+
     public void NotifyDataChanged()
     {
         _sortedChildren.Clear();

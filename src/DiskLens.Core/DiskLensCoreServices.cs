@@ -14,6 +14,7 @@ public static class DiskLensCoreServices
         services.TryAddSingleton<IScanService, ScanService>();
         services.TryAddSingleton<IVolumeService, VolumeService>();
         services.TryAddSingleton<IElevationService, NoElevationService>();
+        services.TryAddSingleton<IFileOperations, GenericFileOperations>();
         return services;
     }
 
