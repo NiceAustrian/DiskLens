@@ -48,7 +48,7 @@ public sealed class MftScanner(IElevationService elevation, ILogger<MftScanner> 
         var root = Path.GetPathRoot(target.Path)!;
         sink.ReportPhase("Opening volume…");
         using var volume = NtfsVolume.Open(root);
-        var reader = new MftReader(volume);
+        var reader = new MftReader(volume, sink.Names);
 
         sink.ReportPhase("Reading MFT…", 0);
         var mft = reader.Read((done, total) => sink.ReportPhase($"Reading MFT · {ByteSize.Format(done)} / {ByteSize.Format(total)}", (double)done / total), ct);
@@ -67,7 +67,7 @@ public sealed class MftScanner(IElevationService elevation, ILogger<MftScanner> 
                 var next = -1;
                 foreach (var c in children.Of(start))
                 {
-                    if ((mft.Flags[c] & NodeFlags.Directory) != 0 && string.Equals(mft.Name[c], part, StringComparison.OrdinalIgnoreCase)) { next = c; break; }
+                    if ((mft.Flags[c] & NodeFlags.Directory) != 0 && sink.Names.EqualsIgnoreCase(mft.NameId[c], part)) { next = c; break; }
                 }
                 if (next < 0) throw new DirectoryNotFoundException($"'{target.Path}' was not found in the MFT.");
                 start = next;
@@ -109,7 +109,7 @@ public sealed class MftScanner(IElevationService elevation, ILogger<MftScanner> 
     {
         var stack = new Stack<(int Record, int SinkId)>();
         stack.Push((startRecord, sink.RootId));
-        var files = new List<FileEntry>(1024);
+        var files = new List<InternedFileEntry>(1024);
         var emitted = 0;
 
         while (stack.Count > 0)
@@ -123,13 +123,13 @@ public sealed class MftScanner(IElevationService elevation, ILogger<MftScanner> 
                 var flags = mft.Flags[c];
                 if ((flags & NodeFlags.Directory) != 0)
                 {
-                    var id = sink.AddDirectory(sinkId, new DirectoryEntry(mft.Name[c], mft.Modified[c], flags));
+                    var id = sink.AddDirectory(sinkId, new InternedDirectoryEntry(mft.NameId[c], mft.Modified[c], flags));
                     if ((flags & NodeFlags.ReparsePoint) == 0 || options.FollowReparsePoints)
                         stack.Push((c, id));
                 }
                 else
                 {
-                    files.Add(new FileEntry(mft.Name[c], mft.Size[c], mft.Allocated[c], mft.Modified[c], flags));
+                    files.Add(new InternedFileEntry(mft.NameId[c], mft.Size[c], mft.Allocated[c], mft.Modified[c], flags));
                 }
             }
             if (files.Count > 0) sink.AddFiles(sinkId, CollectionsMarshal.AsSpan(files));

@@ -83,7 +83,13 @@ public sealed class ScanSession : IDisposable
 
     private void SetState(ScanState state)
     {
-        if (state is ScanState.Completed or ScanState.Cancelled or ScanState.Failed) Builder.Seal();
+        if (state is ScanState.Completed or ScanState.Cancelled or ScanState.Failed)
+        {
+            Builder.Seal();
+            // Scanners leave large short-lived arrays behind (MFT tables, read buffers). Collect and
+            // decommit now, once, instead of holding a few hundred MB until the GC feels like it.
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        }
         Volatile.Write(ref _state, (int)state);
         StateChanged?.Invoke(this);
     }

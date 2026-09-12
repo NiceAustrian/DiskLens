@@ -1,5 +1,7 @@
 using System.Buffers.Binary;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using DiskLens.Core.Collections;
 using DiskLens.Core.Model;
 
 namespace DiskLens.Scanners.Windows.Ntfs;
@@ -32,13 +34,16 @@ internal sealed class MftReader
     public int Runs { get; private set; }
 
     private readonly NtfsVolume _volume;
+    private readonly NamePool _names;
     private readonly int _recordSize;
     private readonly int _bytesPerCluster;
     private readonly long _windowsEpochTicks = new DateTime(1601, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
 
-    public MftReader(NtfsVolume volume)
+    /// <param name="names">Pool the names are interned into – normally the sink's, so ids flow straight into the tree.</param>
+    public MftReader(NtfsVolume volume, NamePool names)
     {
         _volume = volume;
+        _names = names;
         _recordSize = (int)volume.Data.BytesPerFileRecordSegment;
         _bytesPerCluster = (int)volume.Data.BytesPerCluster;
     }
@@ -48,7 +53,7 @@ internal sealed class MftReader
     {
         public required int Count;
         public required int[] Parent;          // MFT index of the parent directory, -1 for unused/root
-        public required string[] Name;
+        public required int[] NameId;          // id in the NamePool
         public required long[] Size;           // logical size of the unnamed $DATA stream
         public required long[] Allocated;
         public required long[] Modified;       // UTC ticks
@@ -70,7 +75,7 @@ internal sealed class MftReader
         {
             Count = count,
             Parent = new int[count],
-            Name = new string[count],
+            NameId = new int[count],
             Size = new long[count],
             Allocated = new long[count],
             Modified = new long[count],
@@ -80,7 +85,8 @@ internal sealed class MftReader
         Array.Fill(result.Parent, -1);
 
         // 2. Stream the MFT extents in big aligned blocks. Several reads stay in flight (NVMe wants
-        //    queue depth), and each block is parsed on all cores while the next ones load.
+        //    queue depth); parsing a 16 MB block takes a few milliseconds, so it stays on this thread –
+        //    which also lets names go straight into the (single-writer) name pool.
         const int BlockSize = 16 * 1024 * 1024;
         const int InFlight = 4;
         var chunks = EnumerateChunks(runs, mftLength, BlockSize).ToList();
@@ -108,14 +114,9 @@ internal sealed class MftReader
             var (read, buffer, firstRecord) = queue.Dequeue();
             var length = read.GetAwaiter().GetResult();
 
-            var records = length / _recordSize;
-            var recordSize = _recordSize;
-            Parallel.For(0, records, new ParallelOptions { CancellationToken = ct }, i =>
-            {
-                var index = firstRecord + i;
-                if (index >= count) return;
-                ParseRecord(buffer.AsSpan(i * recordSize, recordSize), (int)index, result);
-            });
+            var records = (int)Math.Min(length / _recordSize, count - firstRecord);
+            for (var i = 0; i < records; i++)
+                ParseRecord(buffer.AsSpan(i * _recordSize, _recordSize), (int)(firstRecord + i), result);
 
             pool.Push(buffer);
             Enqueue();
@@ -166,7 +167,7 @@ internal sealed class MftReader
         var attrOffset = BinaryPrimitives.ReadUInt16LittleEndian(rec[HdrAttrsOffset..]);
         var isDir = (flags & RecDirectory) != 0;
 
-        string? bestName = null;
+        ReadOnlySpan<byte> bestName = default;
         var bestNs = byte.MaxValue;
         var parent = -1;
         var nameCount = 0;
@@ -215,10 +216,7 @@ internal sealed class MftReader
                             if (rank < bestNs)
                             {
                                 bestNs = rank;
-                                bestName = string.Create(len, v.Slice(66, len * 2).ToArray(), static (dst, src) =>
-                                {
-                                    for (var i = 0; i < dst.Length; i++) dst[i] = (char)BinaryPrimitives.ReadUInt16LittleEndian(src.AsSpan(i * 2));
-                                });
+                                bestName = v.Slice(66, len * 2);   // UTF-16LE, interned below
                                 parent = (int)(BinaryPrimitives.ReadUInt64LittleEndian(v) & 0xFFFFFFFFFFFF);
                                 if (modified == 0) modified = FileTimeToTicks(BinaryPrimitives.ReadInt64LittleEndian(v[16..]));
                                 if ((BinaryPrimitives.ReadUInt32LittleEndian(v[56..]) & FaDirectoryIndex) != 0) isDir = true;
@@ -270,9 +268,9 @@ internal sealed class MftReader
             return;
         }
 
-        if (bestName is null || index == RootRecord && parent == RootRecord)
+        if (bestName.IsEmpty || index == RootRecord && parent == RootRecord)
         {
-            if (index == RootRecord) { r.Name[index] = ""; r.Parent[index] = -1; r.Flags[index] = NodeFlags.Directory | NodeFlags.Root; r.Modified[index] = modified; }
+            if (index == RootRecord) { r.NameId[index] = _names.Intern(""); r.Parent[index] = -1; r.Flags[index] = NodeFlags.Directory | NodeFlags.Root; r.Modified[index] = modified; }
             return;
         }
 
@@ -285,7 +283,7 @@ internal sealed class MftReader
         if ((attrFlags & FaEncrypted) != 0) nf |= NodeFlags.Encrypted;
         if (nameCount > 1) nf |= NodeFlags.HardLink;
 
-        r.Name[index] = bestName;
+        r.NameId[index] = _names.Intern(MemoryMarshal.Cast<byte, char>(bestName));   // x86/ARM are little-endian like NTFS
         r.Parent[index] = parent;
         r.Modified[index] = modified;
         r.Flags[index] = nf;

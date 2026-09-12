@@ -1,3 +1,4 @@
+using DiskLens.Core.Collections;
 using DiskLens.Core.Model;
 
 namespace DiskLens.Core.Scanning;
@@ -21,6 +22,7 @@ public sealed class FsTreeBuilder : IScanSink
 
     public FsTree Tree { get; }
     public int RootId => FsTree.Root;
+    public NamePool Names => Tree.Names;
 
     /// <summary>Live counters for progress reporting.</summary>
     public long NodesAdded => Volatile.Read(ref _nodesAdded);
@@ -42,6 +44,41 @@ public sealed class FsTreeBuilder : IScanSink
         Tree.Propagate(parent, 0, 0, 0, 1, entry.ModifiedUtcTicks);
         Interlocked.Increment(ref _nodesAdded);
         return id;
+    }
+
+    public int AddDirectory(int parent, in InternedDirectoryEntry entry)
+    {
+        int id;
+        lock (_gate)
+        {
+            id = Tree.AppendNode(parent, entry.NameId, entry.Flags | NodeFlags.Directory, 0, 0, entry.ModifiedUtcTicks, Tree.Depth(parent) + 1);
+            Tree.Link(parent, id);
+        }
+        Tree.Propagate(parent, 0, 0, 0, 1, entry.ModifiedUtcTicks);
+        Interlocked.Increment(ref _nodesAdded);
+        return id;
+    }
+
+    public void AddFiles(int parent, ReadOnlySpan<InternedFileEntry> entries)
+    {
+        if (entries.IsEmpty) return;
+
+        long size = 0, allocated = 0, newest = 0;
+        lock (_gate)
+        {
+            var depth = Tree.Depth(parent) + 1;
+            foreach (ref readonly var e in entries)
+            {
+                var id = Tree.AppendNode(parent, e.NameId, e.Flags & ~NodeFlags.Directory, e.Size, e.Allocated, e.ModifiedUtcTicks, depth);
+                Tree.Link(parent, id);
+                size += e.Size;
+                allocated += e.Allocated;
+                if (e.ModifiedUtcTicks > newest) newest = e.ModifiedUtcTicks;
+            }
+        }
+        Tree.Propagate(parent, size, allocated, entries.Length, 0, newest);
+        Interlocked.Add(ref _nodesAdded, entries.Length);
+        Interlocked.Add(ref _bytesSeen, size);
     }
 
     public void AddFiles(int parent, ReadOnlySpan<FileEntry> entries)

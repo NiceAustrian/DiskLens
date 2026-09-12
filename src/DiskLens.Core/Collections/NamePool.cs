@@ -87,6 +87,14 @@ public sealed class NamePool
         return Get(id).SequenceEqual(utf8[..n]);
     }
 
+    public bool EqualsIgnoreCase(int id, ReadOnlySpan<char> name)
+    {
+        Span<char> buffer = stackalloc char[512];
+        var n = GetChars(id, buffer);
+        return n < 0 ? GetString(id).AsSpan().Equals(name, StringComparison.OrdinalIgnoreCase)
+                     : buffer[..n].Equals(name, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>Drops the de-duplication index once no more names will be added; frees ~16 B per distinct name.</summary>
     public void Seal()
     {

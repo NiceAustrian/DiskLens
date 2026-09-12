@@ -55,8 +55,6 @@ if (args.Contains("--bench"))
     Console.WriteLine($"{session.State}: {session.Scanner.Id} · {tree.FileCount(0):N0} files · {tree.DirCount(0):N0} dirs · {DiskLens.Core.ByteSize.Format(tree.TotalSize(0))} · {session.Elapsed.TotalSeconds:0.00}s · {session.Errors.Count} errors");
     if (session.Error is not null) Console.WriteLine(session.Error);
     Console.WriteLine($"Working set: {Environment.WorkingSet / 1024 / 1024} MB, GC heap: {GC.GetTotalMemory(false) / 1024 / 1024} MB");
-    GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
-    Console.WriteLine($"After GC:    {Environment.WorkingSet / 1024 / 1024} MB, GC heap: {GC.GetTotalMemory(true) / 1024 / 1024} MB");
 
     // Name statistics: how much do strings cost and how many are duplicates?
     long chars = 0, nonAscii = 0;
