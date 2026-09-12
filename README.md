@@ -25,7 +25,7 @@ that scans a 1.5 TB drive in ~5 seconds.
     everywhere; ~15 s for the same drive.
 - Context menu: open in file manager, copy path, zoom, move to Recycle Bin (Windows) / delete.
 - Custom title bar on Windows (drag, Snap Layouts, double-click maximise all still work), dark and
-  light theme, DPI aware, idle at 0 % CPU.
+  light theme, DPI aware. Event-driven render loop: 0 wake-ups when idle, partial repaints on hover.
 
 ## Build & run
 

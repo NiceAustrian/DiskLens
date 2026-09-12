@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using DiskLens.Core.Platform;
 using DiskLens.Core.Scanning;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,13 +19,13 @@ public static class DiskLensCoreServices
         return services;
     }
 
-    public static IServiceCollection AddScanner<TScanner>(this IServiceCollection services) where TScanner : class, IFileSystemScanner
+    public static IServiceCollection AddScanner<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TScanner>(this IServiceCollection services) where TScanner : class, IFileSystemScanner
     {
         services.AddSingleton<IFileSystemScanner, TScanner>();
         return services;
     }
 
-    public static IServiceCollection AddVolumeProvider<TProvider>(this IServiceCollection services) where TProvider : class, IVolumeProvider
+    public static IServiceCollection AddVolumeProvider<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TProvider>(this IServiceCollection services) where TProvider : class, IVolumeProvider
     {
         services.AddSingleton<IVolumeProvider, TProvider>();
         return services;

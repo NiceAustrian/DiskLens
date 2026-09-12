@@ -14,7 +14,7 @@ var builder = Host.CreateApplicationBuilder(args);
 
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(o => { o.SingleLine = true; o.TimestampFormat = "HH:mm:ss.fff "; });
-builder.Logging.SetMinimumLevel(LogLevel.Information);
+builder.Logging.SetMinimumLevel(args.Contains("--debug") ? LogLevel.Debug : LogLevel.Information);
 
 builder.Services
     .AddDiskLensCore()

@@ -40,7 +40,9 @@ public sealed class AppWindow : IDisposable
     private IInputContext? _input;
     private GRContext? _grContext;
     private GRBackendRenderTarget? _renderTarget;
-    private SKSurface? _surface;
+    private SKSurface? _surface;          // the window's framebuffer
+    private SKSurface? _scene;            // persistent offscreen scene; partial repaints go here
+    private Timer? _wakeup;
     private float _scale = 1;
     private Vector2D<int> _framebufferSize;
     private Modifiers _modifiers;
@@ -68,8 +70,11 @@ public sealed class AppWindow : IDisposable
     public void Post(Action action)
     {
         lock (_pendingGate) _pending.Enqueue(action);
-        Root.RequestRedraw();
+        Wake();
     }
+
+    /// <summary>Wakes the event loop so the next frame is processed now. Safe from any thread.</summary>
+    public void Wake() => _window?.ContinueEvents();
 
     public void SetTitle(string title)
     {
@@ -85,7 +90,7 @@ public sealed class AppWindow : IDisposable
             API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.ForwardCompatible, new APIVersion(3, 3)),
             VSync = true,
             ShouldSwapAutomatically = false,
-            IsEventDriven = false,
+            IsEventDriven = true,          // block in the OS event loop when idle; animations wake it explicitly
             PreferredStencilBufferBits = 8,
             PreferredBitDepth = new Vector4D<int>(8, 8, 8, 8),
             Samples = 0,
@@ -144,7 +149,7 @@ public sealed class AppWindow : IDisposable
                                () => window.WindowState = window.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized,
                                window.Close,
                                () => window.WindowState == WindowState.Maximized);
-        Chrome.Changed += Root.RequestRedraw;
+        Chrome.Changed += () => { Root.RequestRedraw(); Wake(); };
         Chrome.SetDarkMode(Root.Theme.IsDark);
         Loaded?.Invoke();
 
@@ -177,8 +182,17 @@ public sealed class AppWindow : IDisposable
         _surfaceDirty = true;
     }
 
+    private int _frames, _renders;
+    private long _lastStat = Environment.TickCount64;
+
     private void OnRender(double _)
     {
+        _frames++;
+        if (Environment.TickCount64 - _lastStat > 5000)
+        {
+            if (_frames > 5) _logger.LogDebug("loop: {Frames} iterations, {Renders} renders in 5 s", _frames, _renders);
+            _frames = 0; _renders = 0; _lastStat = Environment.TickCount64;
+        }
         // Pump posted actions first; they usually mark something dirty.
         while (true)
         {
@@ -189,21 +203,37 @@ public sealed class AppWindow : IDisposable
         }
 
         var redraw = Root.Tick() || _surfaceDirty;
-        if (!redraw)
+        if (redraw)
         {
-            Thread.Sleep(8);   // idle: don't spin
-            return;
+            _renders++;
+            if (_surfaceDirty || _surface is null || _scene is null) RecreateSurface();
+
+            // Paint the dirty region into the persistent scene, then present the whole scene.
+            var sceneCanvas = _scene!.Canvas;
+            sceneCanvas.Save();
+            sceneCanvas.Scale(_scale);
+            Root.Render(sceneCanvas);
+            sceneCanvas.Restore();
+
+            var fb = _surface!.Canvas;
+            _scene.Draw(fb, 0, 0, null);
+            fb.Flush();
+            _grContext!.Flush();
+            _window!.SwapBuffers();
         }
 
-        if (_surfaceDirty || _surface is null) RecreateSurface();
-        var canvas = _surface!.Canvas;
-        canvas.Save();
-        canvas.Scale(_scale);
-        Root.Render(canvas);
-        canvas.Restore();
-        canvas.Flush();
-        _grContext!.Flush();
-        _window!.SwapBuffers();
+        // Keep the loop running while animations play (VSync paces it). Anything else that wants
+        // another tick later – tooltip delay, caret blink, or pending work that did not produce a
+        // frame – goes through the timer, so the loop can never spin without drawing.
+        if (redraw && Root.NeedsRedraw) Wake();
+        else if (Root.NeedsRedraw) ArmWakeup(1.0 / 60);
+        else if (Root.NextWakeupIn is { } seconds) ArmWakeup(seconds);
+    }
+
+    private void ArmWakeup(double seconds)
+    {
+        _wakeup ??= new Timer(_ => { Root.RequestRedraw(); Wake(); });
+        _wakeup.Change(TimeSpan.FromSeconds(Math.Max(0.001, seconds)), Timeout.InfiniteTimeSpan);
     }
 
     private void RecreateSurface()
@@ -217,17 +247,23 @@ public sealed class AppWindow : IDisposable
         _renderTarget = new GRBackendRenderTarget(w, h, 0, 8, info);
         _surface = SKSurface.Create(_grContext, _renderTarget, GRSurfaceOrigin.BottomLeft, SKColorType.Rgba8888)
                    ?? throw new InvalidOperationException("Could not create the Skia surface.");
+        _scene?.Dispose();
+        _scene = SKSurface.Create(_grContext, budgeted: true, new SKImageInfo(w, h, SKColorType.Rgba8888, SKAlphaType.Premul))
+                 ?? throw new InvalidOperationException("Could not create the scene surface.");
+        Root.RequestRedraw();   // the new scene is blank
         _surfaceDirty = false;
     }
 
     private void OnClosing()
     {
+        _wakeup?.Dispose();
+        _scene?.Dispose();
         _surface?.Dispose();
         _renderTarget?.Dispose();
         _grContext?.Dispose();
         _input?.Dispose();
         _gl?.Dispose();
-        _surface = null; _renderTarget = null; _grContext = null; _input = null; _gl = null;
+        _surface = null; _scene = null; _renderTarget = null; _grContext = null; _input = null; _gl = null;
     }
 
     public void Dispose()

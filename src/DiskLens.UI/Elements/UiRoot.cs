@@ -15,7 +15,9 @@ public sealed class UiRoot : Element
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private double _lastTick;
     private bool _needsLayout = true;
-    private bool _needsRedraw = true;
+    private bool _needsRedraw = true;      // full repaint
+    private SKRect _dirty = SKRect.Empty;  // partial repaint region (when _needsRedraw is false)
+    private double _wakeupAt = double.PositiveInfinity;
 
     private Element? _hovered;
     private Element? _pressed;
@@ -51,7 +53,13 @@ public sealed class UiRoot : Element
     public Element? Focused => _focused;
     public SKPoint PointerPosition => _pointer;
     public CursorKind CurrentCursor => _captured?.Cursor ?? _hovered?.Cursor ?? CursorKind.Arrow;
-    public bool NeedsRedraw => _needsRedraw || Animator.HasWork;
+    public bool NeedsRedraw => _needsRedraw || !_dirty.IsEmpty || Animator.HasWork;
+
+    /// <summary>Seconds until the root wants to be ticked again without input (tooltip delay, caret blink), or null.</summary>
+    public double? NextWakeupIn => double.IsPositiveInfinity(_wakeupAt) ? null : Math.Max(0, _wakeupAt - _clock.Elapsed.TotalSeconds);
+
+    /// <summary>Asks the host to tick again after <paramref name="seconds"/> even if no input arrives.</summary>
+    public void RequestWakeup(double seconds) => _wakeupAt = Math.Min(_wakeupAt, _clock.Elapsed.TotalSeconds + seconds);
 
     public event Action<CursorKind>? CursorChanged;
 
@@ -78,6 +86,13 @@ public sealed class UiRoot : Element
     public void RequestLayout() { _needsLayout = true; _needsRedraw = true; }
     public void RequestRedraw() => _needsRedraw = true;
 
+    /// <summary>Marks a window-space region for repaint. Regions accumulate into one bounding box.</summary>
+    public void RequestRedraw(SKRect region)
+    {
+        if (_needsRedraw) return;
+        _dirty = _dirty.IsEmpty ? region : SKRect.Union(_dirty, region);
+    }
+
     // Frame ----------------------------------------------------------------------------------------
     /// <summary>Advances animations and lays out if needed. Returns true if a redraw is required.</summary>
     public bool Tick()
@@ -87,13 +102,18 @@ public sealed class UiRoot : Element
         _lastTick = now;
 
         if (Animator.Tick(dt)) _needsRedraw = true;
+        if (now >= _wakeupAt) _wakeupAt = double.PositiveInfinity;
 
         // Tooltip after a short hover delay
-        if (_hovered?.Tooltip is { } tip && _tooltipText is null && now - _hoverSince > 0.6)
+        if (_hovered?.Tooltip is { } tip && _tooltipText is null)
         {
-            _tooltipText = tip;
-            _tooltipAnchor = _pointer;
-            _needsRedraw = true;
+            if (now - _hoverSince > 0.6)
+            {
+                _tooltipText = tip;
+                _tooltipAnchor = _pointer;
+                _needsRedraw = true;
+            }
+            else RequestWakeup(0.6 - (now - _hoverSince));
         }
 
         if (_needsLayout)
@@ -104,15 +124,27 @@ public sealed class UiRoot : Element
             UpdateHover();
             _needsRedraw = true;
         }
-        return _needsRedraw;
+        return _needsRedraw || !_dirty.IsEmpty;
     }
 
-    public void Render(SKCanvas canvas)
+    /// <summary>
+    /// Paints into <paramref name="canvas"/>, which must retain its contents between frames (the
+    /// host keeps an offscreen scene surface). Only the dirty region is cleared and redrawn unless a
+    /// full repaint was requested. Returns the region that was painted.
+    /// </summary>
+    public SKRect Render(SKCanvas canvas)
     {
+        var region = _needsRedraw ? new SKRect(0, 0, Size.Width, Size.Height) : _dirty;
         _needsRedraw = false;
+        _dirty = SKRect.Empty;
+
+        canvas.Save();
+        canvas.ClipRect(region);
         canvas.Clear(Theme.Background);
         Draw(canvas);
         DrawTooltip(canvas);
+        canvas.Restore();
+        return region;
     }
 
     protected override SKSize MeasureContent(SKSize available) => Size;

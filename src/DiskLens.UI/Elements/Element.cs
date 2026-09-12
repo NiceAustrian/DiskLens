@@ -82,7 +82,7 @@ public abstract class Element
         if (_pendingAnimations is { } pending)
         {
             _pendingAnimations = null;
-            foreach (var a in pending) root.Animator.Run(a);
+            foreach (var a in pending) root.Animator.Run(a, this);
             root.RequestRedraw();
         }
         foreach (var c in _children) c.OnAttached(root);
@@ -117,13 +117,23 @@ public abstract class Element
     public bool IsAncestorOf(Element other) => other.Ancestors().Contains(this);
 
     // Invalidation -------------------------------------------------------------------------------
-    public void Invalidate() => Root?.RequestRedraw();
+    /// <summary>Repaints this element's area (plus a margin for shadows/glows) on the next frame.</summary>
+    public void Invalidate()
+    {
+        if (Root is not { } root) return;
+        if (Bounds.IsEmpty) root.RequestRedraw();
+        else root.RequestRedraw(SKRect.Inflate(Bounds, RedrawMargin, RedrawMargin));
+    }
+
     public void InvalidateLayout() => Root?.RequestLayout();
 
-    /// <summary>Runs an animation and keeps redrawing until it finishes. Queued if not yet attached to a root.</summary>
+    /// <summary>How far outside its bounds an element may paint (drop shadows, focus glows).</summary>
+    public const float RedrawMargin = 24;
+
+    /// <summary>Runs an animation, repainting this element after every tick. Queued if not yet attached to a root.</summary>
     public void Animate(IAnimation animation)
     {
-        if (Root is { } root) root.Animator.Run(animation);
+        if (Root is { } root) root.Animator.Run(animation, this);
         else (_pendingAnimations ??= []).Add(animation);
     }
 
@@ -185,7 +195,8 @@ public abstract class Element
     {
         foreach (var c in _children)
         {
-            if (canvas.QuickReject(c.Bounds)) continue;
+            // Children may paint slightly outside their bounds (shadows) – reject generously.
+            if (canvas.QuickReject(SKRect.Inflate(c.Bounds, RedrawMargin, RedrawMargin))) continue;
             c.Draw(canvas);
         }
     }

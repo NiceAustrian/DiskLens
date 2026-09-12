@@ -77,25 +77,37 @@ public sealed class Tween : IAnimation
 /// <summary>Drives all running animations; owned by the UI root.</summary>
 public sealed class Animator
 {
-    private readonly HashSet<IAnimation> _running = [];
-    private readonly List<IAnimation> _scratch = [];
+    private readonly Dictionary<IAnimation, Elements.Element?> _running = [];
+    private readonly List<KeyValuePair<IAnimation, Elements.Element?>> _scratch = [];
 
     public bool HasWork => _running.Count > 0;
 
-    public void Run(IAnimation animation) => _running.Add(animation);
+    /// <summary>
+    /// Starts an animation. With an <paramref name="owner"/>, only that element is repainted per tick
+    /// and the animation is dropped if the owner leaves the tree; without one the whole window repaints.
+    /// </summary>
+    public void Run(IAnimation animation, Elements.Element? owner = null) => _running[animation] = owner;
 
     public void Stop(IAnimation animation) => _running.Remove(animation);
 
-    /// <summary>Ticks everything. Returns true if any animation is still running afterwards.</summary>
+    /// <summary>Ticks everything. Returns true if an ownerless animation ran (caller repaints fully).</summary>
     public bool Tick(float dt)
     {
         if (_running.Count == 0) return false;
         _scratch.Clear();
         _scratch.AddRange(_running);
-        foreach (var a in _scratch)
+        var fullRedraw = false;
+        foreach (var (a, owner) in _scratch)
         {
-            if (!a.Tick(dt)) _running.Remove(a);
+            if (owner is not null && owner.Root is null)
+            {
+                _running.Remove(a);   // orphaned: nobody would see it
+                continue;
+            }
+            var alive = a.Tick(dt);
+            if (owner is null) fullRedraw = true; else owner.Invalidate();
+            if (!alive) _running.Remove(a);
         }
-        return _running.Count > 0;
+        return fullRedraw;
     }
 }

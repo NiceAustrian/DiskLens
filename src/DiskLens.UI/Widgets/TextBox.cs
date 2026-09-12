@@ -90,7 +90,8 @@ public sealed class TextBox : Element
                     paint.IsStroke = false; paint.Color = Theme.Accent;
                     canvas.DrawRect(x - _scrollX + caretX, rect.MidY - style.LineHeight / 2 + 2, 1.5f, style.LineHeight - 4, paint);
                 }
-                Invalidate();   // keep blinking (cheap: only while focused)
+                Root?.RequestWakeup(0.5 - t % 0.5);   // next blink edge
+                Invalidate();
             }
         }
         canvas.Restore();
