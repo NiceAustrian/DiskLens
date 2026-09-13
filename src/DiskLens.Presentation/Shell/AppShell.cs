@@ -187,6 +187,42 @@ public sealed class AppShell
         _ = old.Completion.ContinueWith(_ => old.Dispose());
     }
 
+    /// <summary>Shows a dismissable notice above the content; the button copies <paramref name="details"/> to the clipboard.</summary>
+    public void ShowNotice(string title, string details, string copyLabel)
+    {
+        var first = details.Split('\n').Skip(2).FirstOrDefault(l => l.Length > 0) ?? "";
+        var box = new Box { Padding = new Thickness(14, 10), CornerRadius = 10, Margin = new Thickness(12, 8, 12, 0) };
+        var column = box.Add(new Column { Gap = 8, CrossAlign = CrossAlign.Stretch });
+        column.Add(new Label(title) { StyleSelector = t => t.BodyMedium });
+        column.Add(new WrappedLabel(TrimTo(details, 600)) { StyleSelector = t => t.MonoSmall });
+        var buttons = column.Add(new Row { Gap = 8, MainAlign = MainAlign.End });
+        var copy = buttons.Add(new Button(copyLabel, Icon.Copy) { Style = ButtonStyle.Primary });
+        var close = buttons.Add(new Button("Dismiss"));
+        var frame = new NoticeFrame(box);
+        copy.Activated += () => Root.Clipboard?.SetText(details);
+        close.Activated += () => _contentHost.Parent?.Remove(frame);
+        // Above the content host, below the title bar.
+        if (_contentHost.Parent is { } parent) parent.Insert(1, frame);
+        _ = first;
+    }
+
+    private static string TrimTo(string s, int max) => s.Length <= max ? s : s[..max] + "…";
+
+    private sealed class NoticeFrame : Element
+    {
+        public NoticeFrame(Element content) => Add(content);
+
+        protected override void OnDraw(SKCanvas canvas)
+        {
+            var t = Theme;
+            var r = Children[0].Bounds;
+            using var paint = new SKPaint { IsAntialias = true, Color = t.Danger.WithAlpha(0x22) };
+            canvas.DrawRoundRect(new SKRoundRect(r, 10), paint);
+            paint.Color = t.Danger.WithAlpha(0x60); paint.IsStroke = true;
+            canvas.DrawRoundRect(new SKRoundRect(SKRect.Inflate(r, -0.5f, -0.5f), 9.5f), paint);
+        }
+    }
+
     public void SetTitle(string title, string subtitle)
     {
         _title.Text = title;

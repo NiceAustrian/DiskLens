@@ -24,7 +24,7 @@ public sealed class TreemapView : Element
     private readonly SKPaint _fill = new() { IsAntialias = false };
     private readonly SKPaint _stroke = new() { IsAntialias = false, IsStroke = true, StrokeWidth = 1 };
     private readonly SKPaint _ring = new() { IsAntialias = true, IsStroke = true };
-    private readonly SKPaint _glow = new() { IsAntialias = true, IsStroke = true, MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 3) };
+    private readonly SKPaint _glow = new() { IsAntialias = true, IsStroke = true };
     private SKPicture? _oldPicture;
     private bool _dirty = true;
     private SKRect _layoutBounds;
@@ -262,10 +262,12 @@ public sealed class TreemapView : Element
     {
         if (node < 0 || !_itemOf.TryGetValue(node, out var idx)) return;
         var r = _items[idx].Rect;
+        // Two rings instead of a blurred glow: a mask filter on a GPU canvas is the one thing here
+        // some mobile drivers choke on, and the look is close enough.
+        _glow.StrokeWidth = width + 3; _glow.Color = color.WithAlpha(0x40);
+        canvas.DrawRect(SKRect.Inflate(r, 1, 1), _glow);
         _ring.StrokeWidth = width; _ring.Color = color;
         canvas.DrawRect(SKRect.Inflate(r, -width / 2, -width / 2), _ring);
-        _glow.StrokeWidth = width + 3; _glow.Color = color.WithAlpha(0x40);
-        canvas.DrawRect(r, _glow);
     }
 
     private void BeginZoomTransition()
@@ -310,6 +312,19 @@ public sealed class TreemapView : Element
             if (i > hit && _items[i].Rect.Contains(p)) hit = i;
         }
         return hit;
+    }
+
+    protected override void OnPointerDown(PointerEvent e)
+    {
+        // Touch has no hover: resolve the item under the finger now so a tap selects it.
+        var hit = HitItem(e.Position);
+        if (hit != _hoverItem)
+        {
+            _hoverItem = hit;
+            _vm.Hovered = hit >= 0 ? _items[hit].Node : FsTree.None;
+            Invalidate();
+        }
+        base.OnPointerDown(e);
     }
 
     protected override void OnPointerMove(PointerEvent e)

@@ -32,6 +32,7 @@ public class MainActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        CrashReporter.Install(this);
 
         var services = new ServiceCollection();
         services.AddLogging(b => { b.AddProvider(new LogcatLoggerProvider()); b.SetMinimumLevel(LogLevel.Information); });
@@ -51,6 +52,9 @@ public class MainActivity : Activity
         ApplySystemBarStyle(root.Theme.IsDark);
         _view.DarkModeChanged += ApplySystemBarStyle;
         _hadAllFilesAccess = _services.GetRequiredService<IElevationService>().IsElevated;
+
+        if (CrashReporter.TakeLastReport() is { } report)
+            _view.Post(() => _shell.ShowNotice("DiskLens crashed last time", report, "Copy report"));
     }
 
     protected override void OnResume()

@@ -184,11 +184,13 @@ public abstract class Element
         if (!IsVisible || Opacity <= 0) return;
         var restore = canvas.Save();
         if (ClipsChildren) canvas.ClipRect(Bounds, antialias: true);
-        if (Opacity < 1) canvas.SaveLayer(new SKPaint { Color = SKColors.White.WithAlpha((byte)(Opacity * 255)) });
+        SKPaint? layer = null;
+        if (Opacity < 1) canvas.SaveLayer(layer = new SKPaint { Color = SKColors.White.WithAlpha((byte)(Opacity * 255)) });
         OnDraw(canvas);
         DrawChildren(canvas);
         OnDrawOverlay(canvas);
         canvas.RestoreToCount(restore);
+        layer?.Dispose();
     }
 
     protected virtual void DrawChildren(SKCanvas canvas)

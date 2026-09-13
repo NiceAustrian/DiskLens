@@ -12,7 +12,7 @@
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <RootNamespace>$(MSBuildProjectName)</RootNamespace>
     <!-- Overridden by the release workflow from the git tag (-p:Version=x.y.z). -->
-    <Version Condition="'$(Version)' == ''">0.3.1</Version>
+    <Version Condition="'$(Version)' == ''">0.3.2</Version>
     <Authors>Paul Bobik</Authors>
     <Product>DiskLens</Product>
     <Copyright>Copyright © 2026 Paul Bobik</Copyright>

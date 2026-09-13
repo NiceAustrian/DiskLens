@@ -79,6 +79,7 @@ public sealed class DiskLensView : SKGLSurfaceView, IAppHost
             _scene = SKSurface.Create(ctx, budgeted: true, new SKImageInfo(w, h, SKColorType.Rgba8888, SKAlphaType.Premul));
             _sceneContext = ctx;
             _sceneW = w; _sceneH = h;
+            if (!_loadedRaised) CrashReporter.Renderer = Android.Opengl.GLES20.GlGetString(Android.Opengl.GLES20.GlRenderer) ?? "unknown";
             _root.Resize(new SKSize(w / _scale, h / _scale), _scale);
             if (!_loadedRaised) { _loadedRaised = true; Loaded?.Invoke(); }
             fresh = true;
@@ -93,13 +94,21 @@ public sealed class DiskLensView : SKGLSurfaceView, IAppHost
         }
 
         if (_scene is null) return;
-        if (_root.Tick() || fresh)
+        try
         {
-            var c = _scene.Canvas;
-            c.Save();
-            c.Scale(_scale);
-            _root.Render(c);
-            c.Restore();
+            if (_root.Tick() || fresh)
+            {
+                var c = _scene.Canvas;
+                c.Save();
+                c.Scale(_scale);
+                _root.Render(c);
+                c.Restore();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Keep the app alive; the report tells us what to fix.
+            CrashReporter.Write("Render", ex);
         }
         _scene.Draw(e.Surface.Canvas, 0, 0, null);
 
@@ -177,7 +186,12 @@ public sealed class DiskLensView : SKGLSurfaceView, IAppHost
 
     private void RunOnGl(Action a)
     {
-        QueueEvent(new Java.Lang.Runnable(a));
+        QueueEvent(new Java.Lang.Runnable(() =>
+        {
+            // A bug in an input handler must not take the GL thread (and the app) down.
+            try { a(); }
+            catch (Exception ex) { CrashReporter.Write("Input/GL action", ex); }
+        }));
         RequestRender();
     }
 

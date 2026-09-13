@@ -3,6 +3,19 @@
 All notable changes to DiskLens. The format follows [Keep a Changelog](https://keepachangelog.com/);
 versions follow [SemVer](https://semver.org/).
 
+## [0.3.2] – 2026-09-13
+
+### Fixed
+- Treemap: a tap without finger movement now selects the tile (selection used to depend on a hover
+  update that touch never produces).
+- Treemap selection/hover rings no longer use a blur mask filter – suspected to crash some mobile
+  GPU drivers.
+- Android: an exception in an input handler or during rendering no longer kills the app.
+
+### Added
+- Android crash reporter: unhandled exceptions are written to `Download/DiskLens-crash.txt` and
+  shown on the next start with a *Copy report* button.
+
 ## [0.3.1] – 2026-09-13
 
 ### Fixed
